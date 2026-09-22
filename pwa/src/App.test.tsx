@@ -17,6 +17,26 @@ describe("App (PWA)", () => {
     expect(screen.queryByRole("heading", { name: /ingreso/i })).not.toBeInTheDocument();
   });
 
+  it("un equipo sin contrato asignado no se puede elegir (evita un contrato_id nulo en la orden)", async () => {
+    await db.sesion.put({ id: "actual", token: "tok-ya-logueado", guardado_en: "2026-01-01" });
+    await db.catalogoLocal.add({ id: "SIN-CONTRATO", tipo: "equipo", datos: { serie: "SIN-CONTRATO", contrato_id: null }, actualizado_en: "2026-01-01" });
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify([]), { status: 200 }));
+    render(<App />);
+    await screen.findByRole("heading", { name: /elegir equipo/i });
+    const boton = await screen.findByRole("button", { name: "SIN-CONTRATO" });
+    expect(boton).toBeDisabled();
+  });
+
+  it("la pantalla de stock movil tiene un boton para volver", async () => {
+    await db.sesion.put({ id: "actual", token: "tok-ya-logueado", guardado_en: "2026-01-01" });
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify([]), { status: 200 }));
+    render(<App />);
+    await userEvent.click(await screen.findByRole("button", { name: /stock móvil/i }));
+    expect(await screen.findByRole("heading", { name: /stock móvil/i })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /volver/i }));
+    expect(await screen.findByRole("heading", { name: /elegir equipo/i })).toBeInTheDocument();
+  });
+
   it("«Sincronizar ahora» usa TanStack Query (useMutation) para procesar el Outbox", async () => {
     await db.sesion.put({ id: "actual", token: "tok-ya-logueado", guardado_en: "2026-01-01" });
     await db.ordenesLocal.add({

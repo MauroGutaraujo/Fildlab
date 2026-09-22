@@ -65,6 +65,20 @@ describe("OrdenForm — lecturas de agua", () => {
     expect(await screen.findByRole("button", { name: /cerrar orden/i })).toBeEnabled();
   });
 
+  it("si falla la escritura en Dexie al cerrar (ej. cuota excedida), se avisa y no navega", async () => {
+    const getCurrentPosition = vi.fn((ok) => ok({ coords: { latitude: -8.11, longitude: -79.02 } }));
+    vi.stubGlobal("navigator", { geolocation: { getCurrentPosition } });
+    vi.spyOn(db.ordenesLocal, "add").mockRejectedValueOnce(new Error("QuotaExceededError"));
+    const onCerrada = vi.fn();
+    render(<OrdenForm contratoId={1} equipoSerie="RO-1" tecnicoId={2} onCerrada={onCerrada} />);
+    await completarLecturasValidas();
+    await userEvent.click(screen.getByRole("button", { name: /obtener ubicación/i }));
+    await userEvent.click(screen.getByTestId("firma-canvas"));
+    await userEvent.click(await screen.findByRole("button", { name: /cerrar orden/i }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(/no se pudo guardar/i);
+    expect(onCerrada).not.toHaveBeenCalled();
+  });
+
   it("al cerrar, escribe la orden en ordenesLocal con estado_sync pendiente", async () => {
     const getCurrentPosition = vi.fn((ok) => ok({ coords: { latitude: -8.11, longitude: -79.02 } }));
     vi.stubGlobal("navigator", { geolocation: { getCurrentPosition } });

@@ -25,6 +25,8 @@ export function OrdenForm({ contratoId, equipoSerie, tecnicoId, onCerrada }: Pro
   const [lecturas, setLecturas] = useState<Lecturas>(vacias());
   const [tocado, setTocado] = useState<Partial<Record<CampoLectura, boolean>>>({});
   const [firma, setFirma] = useState<string | null>(null);
+  const [tipoIntervencion, setTipoIntervencion] = useState<"PREVENTIVO" | "CORRECTIVO">("PREVENTIVO");
+  const [errorGuardado, setErrorGuardado] = useState<string | null>(null);
   const gps = useGps();
 
   const errores = Object.fromEntries(
@@ -36,23 +38,31 @@ export function OrdenForm({ contratoId, equipoSerie, tecnicoId, onCerrada }: Pro
 
   async function cerrarOrden() {
     if (!puedeCerrar || firma === null || gps.lat === null || gps.lng === null) return;
+    setErrorGuardado(null);
     const ahora = new Date().toISOString();
-    await db.ordenesLocal.add({
-      id: crypto.randomUUID(),
-      contrato_id: contratoId,
-      equipo_serie: equipoSerie,
-      tecnico_id: tecnicoId,
-      tipo_intervencion: "PREVENTIVO",
-      fecha_creacion_cliente: ahora,
-      lecturas_agua: Object.fromEntries(CAMPOS_LECTURA_ORDEN.map((c) => [c, Number(lecturas[c])])) as never,
-      firma_base64: firma,
-      gps_latitud: gps.lat,
-      gps_longitud: gps.lng,
-      repuestos_consumidos: [],
-      estado_sync: "pendiente",
-      creado_en_local: ahora,
-      intentos_sync: 0,
-    });
+    try {
+      await db.ordenesLocal.add({
+        id: crypto.randomUUID(),
+        contrato_id: contratoId,
+        equipo_serie: equipoSerie,
+        tecnico_id: tecnicoId,
+        tipo_intervencion: tipoIntervencion,
+        fecha_creacion_cliente: ahora,
+        lecturas_agua: Object.fromEntries(CAMPOS_LECTURA_ORDEN.map((c) => [c, Number(lecturas[c])])) as never,
+        firma_base64: firma,
+        gps_latitud: gps.lat,
+        gps_longitud: gps.lng,
+        repuestos_consumidos: [],
+        estado_sync: "pendiente",
+        creado_en_local: ahora,
+        intentos_sync: 0,
+      });
+    } catch {
+      // Cuota de IndexedDB excedida, modo privado, etc.: el técnico debe enterarse, no perder
+      // el acta en silencio (RNF-04). Las lecturas/firma/GPS quedan intactos para reintentar.
+      setErrorGuardado("No se pudo guardar la orden en este dispositivo. Verifica el espacio disponible e intenta de nuevo.");
+      return;
+    }
     onCerrada?.();
   }
 
@@ -82,6 +92,17 @@ export function OrdenForm({ contratoId, equipoSerie, tecnicoId, onCerrada }: Pro
       {lecturasCompletas && (
         <div className="mt-6 space-y-4">
           <div>
+            <h2 className="mb-1 font-medium">Tipo de intervención</h2>
+            <select
+              value={tipoIntervencion}
+              onChange={(e) => setTipoIntervencion(e.target.value as "PREVENTIVO" | "CORRECTIVO")}
+              className="rounded border border-slate-300 px-3 py-2"
+            >
+              <option value="PREVENTIVO">Preventivo</option>
+              <option value="CORRECTIVO">Correctivo</option>
+            </select>
+          </div>
+          <div>
             <h2 className="mb-1 font-medium">Firma</h2>
             <Firma onCambio={setFirma} />
           </div>
@@ -97,6 +118,11 @@ export function OrdenForm({ contratoId, equipoSerie, tecnicoId, onCerrada }: Pro
               </p>
             )}
           </div>
+          {errorGuardado && (
+            <p role="alert" className="text-red-700">
+              {errorGuardado}
+            </p>
+          )}
           <button
             type="button"
             disabled={!puedeCerrar}
