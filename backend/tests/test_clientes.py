@@ -32,6 +32,54 @@ async def test_ruc_duplicado_409(client, gerente_h):
     assert r.status_code == 409
 
 
+async def test_razon_social_muy_larga_422_nunca_500(client, gerente_h):
+    """razon_social es VARCHAR(150); antes de la validación esto tumbaba la sesión con un 500 de Postgres."""
+    r = await client.post("/api/v1/clientes", json={**BODY, "razon_social": "X" * 200}, headers=gerente_h)
+    assert r.status_code == 422
+
+
+async def test_direccion_muy_larga_422_nunca_500(client, gerente_h):
+    r = await client.post("/api/v1/clientes", json={**BODY, "direccion": "Y" * 2000}, headers=gerente_h)
+    assert r.status_code == 422
+
+
+async def test_creacion_concurrente_con_mismo_ruc_una_gana_ninguna_500(engine):
+    """Dos POST con el mismo RUC pueden pasar ambos el `get` previo bajo carrera real; ninguno debe dar 500.
+
+    Usa el engine real (sin el `db` transaccional de los demás tests, que aislaría cada
+    request en su propia sesión) para que cada request abra su propia sesión, como en producción.
+    """
+    import asyncio
+
+    from httpx import ASGITransport, AsyncClient
+    from sqlalchemy.ext.asyncio import AsyncSession
+
+    from app.core.security import create_access_token, hash_password
+    from app.main import app
+    from app.models.cliente import Cliente
+    from app.models.usuario import Usuario
+
+    ruc = "20988888801"
+    async with AsyncSession(engine, expire_on_commit=False) as s:
+        u = Usuario(nombre="Race", email="race@test.pe", password_hash=hash_password("x"), rol="GERENCIA")
+        s.add(u)
+        await s.commit()
+        headers = {"Authorization": f"Bearer {create_access_token(u.id, u.rol)}"}
+
+    async def crear():
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
+            return await c.post("/api/v1/clientes", json={**BODY, "ruc": ruc}, headers=headers)
+
+    try:
+        r1, r2 = await asyncio.gather(crear(), crear())
+        assert sorted([r1.status_code, r2.status_code]) == [201, 409]
+    finally:
+        async with AsyncSession(engine) as s:
+            await s.execute(text("DELETE FROM clientes WHERE ruc = :r"), {"r": ruc})
+            await s.execute(text("DELETE FROM usuarios WHERE email = 'race@test.pe'"))
+            await s.commit()
+
+
 @pytest.mark.parametrize("campo", ["razon_social", "direccion"])
 async def test_campos_obligatorios_422(client, gerente_h, campo):
     for valor in (None, "", "   "):
