@@ -221,7 +221,7 @@ CREATE TABLE predicciones_rul (
 ## 7. CHECKLIST DE IMPLEMENTACIÓN BASADO EN LA EDT
 
 - [ ] **Fase 3: Núcleo Transaccional**
-  - [ ] 3.1 Plataforma Web Central
+  - [x] 3.1 Plataforma Web Central
     - [x] 3.1.1 Módulo de clientes (Validación RUC de 11 dígitos)
     - [x] 3.1.2 Módulo de contratos y configuración SLA
     - [x] 3.1.3 Módulo de ventas
