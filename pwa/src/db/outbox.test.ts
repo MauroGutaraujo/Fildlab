@@ -59,6 +59,46 @@ describe("procesarOutbox", () => {
     expect(orden).toEqual(["b", "a"]); // b es mas antigua, va primero
   });
 
+  it("recupera ordenes atrapadas en 'sincronizando' (proceso muerto a mitad de sync) antes de procesar", async () => {
+    // Si el dispositivo se apaga/recarga entre marcar "sincronizando" y recibir la respuesta,
+    // sin esto la orden queda huerfana para siempre (viola RNF-04: cero perdida).
+    await db.ordenesLocal.add({ ...ORDEN_BASE, id: "55555555-5555-5555-5555-555555555555", estado_sync: "sincronizando" });
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ id: "1" }), { status: 201 }));
+    await procesarOutbox();
+    expect((await db.ordenesLocal.get("55555555-5555-5555-5555-555555555555"))?.estado_sync).toBe("sincronizada");
+  });
+
+  it("un 409 por carrera (la orden SI existe en el servidor) se reconcilia como sincronizada, no como error", async () => {
+    // Dos POST del mismo id casi simultaneos: el que pierde la carrera recibe 409 de
+    // IntegrityError, pero la orden SI se creo (la gano la otra peticion) — no es un
+    // fallo de negocio real, y no debe marcarse como perdida.
+    await agregarPendiente("66666666-6666-6666-6666-666666666666");
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      if ((init?.method ?? "GET") === "POST") {
+        return new Response(JSON.stringify({ detail: "El registro ya existe o entra en conflicto" }), { status: 409 });
+      }
+      // GET /ordenes/{id} de reconciliacion: la orden si existe en el servidor.
+      expect(String(input)).toContain("66666666-6666-6666-6666-666666666666");
+      return new Response(JSON.stringify({ id: "66666666-6666-6666-6666-666666666666", estado: "SINCRONIZADA" }), { status: 200 });
+    });
+    await procesarOutbox();
+    expect((await db.ordenesLocal.get("66666666-6666-6666-6666-666666666666"))?.estado_sync).toBe("sincronizada");
+  });
+
+  it("un 409 real (la orden NO existe: fallo de negocio, ej. stock insuficiente) se marca como error", async () => {
+    await agregarPendiente("77777777-7777-7777-7777-777777777777");
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (_input, init) => {
+      if ((init?.method ?? "GET") === "POST") {
+        return new Response(JSON.stringify({ detail: "FILT-05: stock 2, se piden 5" }), { status: 409 });
+      }
+      return new Response(JSON.stringify({ detail: "Orden no encontrada" }), { status: 404 });
+    });
+    await procesarOutbox();
+    const o = await db.ordenesLocal.get("77777777-7777-7777-7777-777777777777");
+    expect(o?.estado_sync).toBe("error");
+    expect(o?.error_detalle).toContain("stock 2, se piden 5");
+  });
+
   it("no envia campos de bookkeeping local (estado_sync, error_detalle, etc.) al backend", async () => {
     await agregarPendiente("44444444-4444-4444-4444-444444444444");
     const f = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ id: "1" }), { status: 201 }));

@@ -9,7 +9,17 @@ export function Firma({ onCambio }: { onCambio: (base64: string | null) => void 
   return (
     <div>
       <SignatureCanvas
-        canvasProps={{ "data-testid": "firma-canvas", className: "w-full rounded border border-slate-300 bg-white", height: 160 } as never}
+        canvasProps={
+          {
+            "data-testid": "firma-canvas",
+            className: "w-full rounded border border-slate-300 bg-white",
+            // width/height explícitos: sin ambos, react-signature-canvas escala el bitmap con
+            // window.devicePixelRatio (_resizeCanvas) y el area dibujable vertical real queda
+            // recortada a height/ratio — en un Galaxy A14 (DPR~2.6-3) casi toda la firma se pierde.
+            width: 600,
+            height: 200,
+          } as never
+        }
         penColor="black"
         minWidth={1}
         maxWidth={2}
