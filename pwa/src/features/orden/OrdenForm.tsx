@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { CAMPOS_LECTURA_ORDEN, type CampoLectura, errorLectura } from "../../lib/validators";
+import { Firma } from "./Firma";
+import { useGps } from "./useGps";
 
 const ETIQUETAS: Record<CampoLectura, string> = {
   tds_entrada_ppm: "TDS entrada (ppm)",
@@ -19,11 +21,15 @@ const vacias = (): Lecturas =>
 export function OrdenForm() {
   const [lecturas, setLecturas] = useState<Lecturas>(vacias());
   const [tocado, setTocado] = useState<Partial<Record<CampoLectura, boolean>>>({});
+  const [firma, setFirma] = useState<string | null>(null);
+  const gps = useGps();
 
   const errores = Object.fromEntries(
     CAMPOS_LECTURA_ORDEN.map((c) => [c, errorLectura(c, lecturas[c])]),
   ) as Record<CampoLectura, string | null>;
   const lecturasCompletas = CAMPOS_LECTURA_ORDEN.every((c) => errores[c] === null);
+  const gpsCompleto = gps.lat !== null && gps.lng !== null;
+  const puedeCerrar = lecturasCompletas && firma !== null && gpsCompleto;
 
   return (
     <section className="p-4">
@@ -47,6 +53,30 @@ export function OrdenForm() {
       <button type="button" disabled={!lecturasCompletas} className="mt-4 rounded bg-sky-700 px-4 py-2 text-white disabled:opacity-60">
         Continuar
       </button>
+
+      {lecturasCompletas && (
+        <div className="mt-6 space-y-4">
+          <div>
+            <h2 className="mb-1 font-medium">Firma</h2>
+            <Firma onCambio={setFirma} />
+          </div>
+          <div>
+            <h2 className="mb-1 font-medium">Ubicación</h2>
+            <button type="button" onClick={gps.solicitar} className="rounded border border-sky-700 px-4 py-2 text-sky-700">
+              Obtener ubicación
+            </button>
+            {gps.error && <p className="mt-1 text-red-700">{gps.error}</p>}
+            {gpsCompleto && (
+              <p className="mt-1 text-sm text-slate-600">
+                {gps.lat}, {gps.lng}
+              </p>
+            )}
+          </div>
+          <button type="button" disabled={!puedeCerrar} className="rounded bg-emerald-700 px-4 py-2 text-white disabled:opacity-60">
+            Cerrar orden
+          </button>
+        </div>
+      )}
     </section>
   );
 }
