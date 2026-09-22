@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.db import get_session
 from app.core.deps import get_current_user, require_role
 from app.models.cliente import Cliente
+from app.models.contrato import Contrato
 from app.schemas.cliente import ClienteIn, ClienteOut, ClienteUpdate
 
 router = APIRouter(prefix="/clientes", tags=["clientes"], dependencies=[Depends(get_current_user)])
@@ -50,6 +51,11 @@ async def actualizar(ruc: str, datos: ClienteUpdate, session: AsyncSession = Dep
 @router.delete("/{ruc}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[solo_gerencia])
 async def anular(ruc: str, session: AsyncSession = Depends(get_session)):
     cliente = await _obtener(session, ruc)
+    con_contrato = await session.execute(
+        select(Contrato.id).where(Contrato.cliente_ruc == ruc, Contrato.estado == "ACTIVO").limit(1)
+    )
+    if con_contrato.first() is not None:
+        raise HTTPException(status.HTTP_409_CONFLICT, "El cliente tiene contratos activos")
     cliente.activo = False
     await session.flush()
     return Response(status_code=status.HTTP_204_NO_CONTENT)

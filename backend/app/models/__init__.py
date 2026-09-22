@@ -6,4 +6,4 @@ class Base(DeclarativeBase):
 
 
 # Importar cada modelo aquí para que Base.metadata los conozca.
-from app.models import cliente, usuario  # noqa: E402,F401
+from app.models import cliente, contrato, usuario  # noqa: E402,F401

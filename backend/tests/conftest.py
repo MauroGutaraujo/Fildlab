@@ -76,6 +76,19 @@ def auth_headers():
 
 
 @pytest_asyncio.fixture
+async def crear_cliente(db):
+    from app.models.cliente import Cliente
+
+    async def _crear(ruc="20612493821", razon_social="Clínica Test SAC", direccion="Trujillo"):
+        c = Cliente(ruc=ruc, razon_social=razon_social, direccion=direccion)
+        db.add(c)
+        await db.flush()
+        return c
+
+    return _crear
+
+
+@pytest_asyncio.fixture
 async def gerente_h(crear_usuario, auth_headers):
     return auth_headers(await crear_usuario("GERENCIA"))
 
