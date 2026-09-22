@@ -227,7 +227,7 @@ CREATE TABLE predicciones_rul (
     - [x] 3.1.3 Módulo de ventas
     - [x] 3.1.4 Módulo de inventario (Stock central y movimientos)
     - [x] 3.1.5 Módulo de equipos (Ficha técnica y series)
-    - [ ] 3.1.6 Liquidación de órdenes y notas de corrección (Adendas)
+    - [x] 3.1.6 Liquidación de órdenes y notas de corrección (Adendas)
     - [x] 3.1.7 Control de accesos RBAC (Argon2 + JWT)
   - [ ] 3.2 PWA de Campo (Offline-First)
     - [ ] 3.2.1 Formulario de órdenes de servicio y lectura de agua (TDS entrada/post-membrana/producto, pH, conductividad, resistividad, litros red y litros agua pura)
