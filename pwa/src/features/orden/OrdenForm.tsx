@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { db } from "../../db/dexie";
+import { consumir } from "../../db/stock";
 import { CAMPOS_LECTURA_ORDEN, type CampoLectura, errorLectura } from "../../lib/validators";
 import { Firma } from "./Firma";
 import { useGps } from "./useGps";
@@ -27,6 +28,10 @@ export function OrdenForm({ contratoId, equipoSerie, tecnicoId, onCerrada }: Pro
   const [firma, setFirma] = useState<string | null>(null);
   const [tipoIntervencion, setTipoIntervencion] = useState<"PREVENTIVO" | "CORRECTIVO">("PREVENTIVO");
   const [errorGuardado, setErrorGuardado] = useState<string | null>(null);
+  const [repuestos, setRepuestos] = useState<{ repuesto_codigo: string; cantidad: number }[]>([]);
+  const [codigoRepuesto, setCodigoRepuesto] = useState("");
+  const [cantidadRepuesto, setCantidadRepuesto] = useState("");
+  const [errorRepuesto, setErrorRepuesto] = useState<string | null>(null);
   const gps = useGps();
 
   const errores = Object.fromEntries(
@@ -35,6 +40,26 @@ export function OrdenForm({ contratoId, equipoSerie, tecnicoId, onCerrada }: Pro
   const lecturasCompletas = CAMPOS_LECTURA_ORDEN.every((c) => errores[c] === null);
   const gpsCompleto = gps.lat !== null && gps.lng !== null;
   const puedeCerrar = lecturasCompletas && firma !== null && gpsCompleto;
+
+  async function agregarRepuesto() {
+    const codigo = codigoRepuesto.trim();
+    const cantidad = Number(cantidadRepuesto);
+    if (!codigo || !Number.isInteger(cantidad) || cantidad <= 0) {
+      setErrorRepuesto("Indica un código y una cantidad válida");
+      return;
+    }
+    // Descuenta del stock móvil local de inmediato (RN-03 fase 1, REQ-06): si no alcanza,
+    // consumir() rechaza sin tocar el registro.
+    const r = await consumir(codigo, cantidad);
+    if (!r.ok) {
+      setErrorRepuesto(r.motivo);
+      return;
+    }
+    setErrorRepuesto(null);
+    setRepuestos((prev) => [...prev, { repuesto_codigo: codigo, cantidad }]);
+    setCodigoRepuesto("");
+    setCantidadRepuesto("");
+  }
 
   async function cerrarOrden() {
     if (!puedeCerrar || firma === null || gps.lat === null || gps.lng === null) return;
@@ -52,7 +77,7 @@ export function OrdenForm({ contratoId, equipoSerie, tecnicoId, onCerrada }: Pro
         firma_base64: firma,
         gps_latitud: gps.lat,
         gps_longitud: gps.lng,
-        repuestos_consumidos: [],
+        repuestos_consumidos: repuestos,
         estado_sync: "pendiente",
         creado_en_local: ahora,
         intentos_sync: 0,
@@ -101,6 +126,41 @@ export function OrdenForm({ contratoId, equipoSerie, tecnicoId, onCerrada }: Pro
               <option value="PREVENTIVO">Preventivo</option>
               <option value="CORRECTIVO">Correctivo</option>
             </select>
+          </div>
+          <div>
+            <h2 className="mb-1 font-medium">Repuestos consumidos</h2>
+            <div className="flex flex-wrap items-end gap-2">
+              <label className="text-sm">
+                Código de repuesto
+                <input
+                  value={codigoRepuesto}
+                  onChange={(e) => setCodigoRepuesto(e.target.value)}
+                  className="mt-1 block rounded border border-slate-300 px-3 py-2"
+                />
+              </label>
+              <label className="text-sm">
+                Cantidad consumida
+                <input
+                  value={cantidadRepuesto}
+                  onChange={(e) => setCantidadRepuesto(e.target.value)}
+                  inputMode="numeric"
+                  className="mt-1 block rounded border border-slate-300 px-3 py-2"
+                />
+              </label>
+              <button type="button" onClick={agregarRepuesto} className="rounded border border-sky-700 px-4 py-2 text-sky-700">
+                Agregar repuesto
+              </button>
+            </div>
+            {errorRepuesto && <p className="mt-1 text-red-700">{errorRepuesto}</p>}
+            {repuestos.length > 0 && (
+              <ul className="mt-2 text-sm text-slate-600">
+                {repuestos.map((r, i) => (
+                  <li key={i}>
+                    {r.repuesto_codigo} × {r.cantidad}
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
           <div>
             <h2 className="mb-1 font-medium">Firma</h2>

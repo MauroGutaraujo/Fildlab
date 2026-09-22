@@ -4,6 +4,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { OrdenForm } from "./OrdenForm";
 import { db } from "../../db/dexie";
+import { cargarStockTurno } from "../../db/stock";
 
 // react-signature-canvas usa signature_pad, que necesita un CanvasRenderingContext2D real
 // (jsdom no lo implementa). Se reemplaza por un doble mínimo que expone el mismo contrato
@@ -94,5 +95,36 @@ describe("OrdenForm — lecturas de agua", () => {
       firma_base64: "data:image/png;base64,FIRMA", gps_latitud: -8.11, gps_longitud: -79.02,
     });
     expect(guardadas[0].lecturas_agua.tds_entrada_ppm).toBe(350);
+    expect(guardadas[0].repuestos_consumidos).toEqual([]);
+  });
+
+  it("agregar un repuesto consumido lo descuenta del stock movil local y lo incluye al cerrar", async () => {
+    await cargarStockTurno([{ repuesto_codigo: "FILT-05", cantidad: 10 }], "turno-test");
+    const getCurrentPosition = vi.fn((ok) => ok({ coords: { latitude: -8.11, longitude: -79.02 } }));
+    vi.stubGlobal("navigator", { geolocation: { getCurrentPosition } });
+    render(<OrdenForm contratoId={1} equipoSerie="RO-1" tecnicoId={2} />);
+    await completarLecturasValidas();
+    await userEvent.type(screen.getByLabelText(/código de repuesto/i), "FILT-05");
+    await userEvent.type(screen.getByLabelText(/cantidad consumida/i), "3");
+    await userEvent.click(screen.getByRole("button", { name: /agregar repuesto/i }));
+    expect(await screen.findByText(/FILT-05.*3/)).toBeInTheDocument();
+    expect((await db.stockMovilLocal.get("FILT-05"))?.cantidad_consumida).toBe(3);
+
+    await userEvent.click(screen.getByRole("button", { name: /obtener ubicación/i }));
+    await userEvent.click(screen.getByTestId("firma-canvas"));
+    await userEvent.click(await screen.findByRole("button", { name: /cerrar orden/i }));
+    const guardada = (await db.ordenesLocal.toArray())[0];
+    expect(guardada.repuestos_consumidos).toEqual([{ repuesto_codigo: "FILT-05", cantidad: 3 }]);
+  });
+
+  it("agregar un repuesto que excede el stock movil local se rechaza y no se agrega", async () => {
+    await cargarStockTurno([{ repuesto_codigo: "FILT-05", cantidad: 2 }], "turno-test");
+    render(<OrdenForm contratoId={1} equipoSerie="RO-1" tecnicoId={2} />);
+    await completarLecturasValidas();
+    await userEvent.type(screen.getByLabelText(/código de repuesto/i), "FILT-05");
+    await userEvent.type(screen.getByLabelText(/cantidad consumida/i), "5");
+    await userEvent.click(screen.getByRole("button", { name: /agregar repuesto/i }));
+    expect(await screen.findByText(/stock móvil insuficiente/i)).toBeInTheDocument();
+    expect(screen.queryByText(/FILT-05.*5/)).not.toBeInTheDocument();
   });
 });
