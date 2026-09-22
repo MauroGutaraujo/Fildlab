@@ -43,6 +43,39 @@ async def db(engine):
 
 
 @pytest_asyncio.fixture
+async def crear_usuario(db):
+    from itertools import count
+
+    from app.core.security import hash_password
+    from app.models.usuario import Usuario
+
+    n = count(1)
+
+    async def _crear(rol="GERENCIA", email=None, password="pw-de-prueba", nombre="Usuario Test"):
+        u = Usuario(
+            nombre=nombre,
+            email=email or f"u{next(n)}-{rol.lower()}@test.pe",
+            password_hash=hash_password(password),
+            rol=rol,
+        )
+        db.add(u)
+        await db.flush()
+        return u
+
+    return _crear
+
+
+@pytest.fixture
+def auth_headers():
+    from app.core.security import create_access_token
+
+    def _h(usuario):
+        return {"Authorization": f"Bearer {create_access_token(usuario.id, usuario.rol)}"}
+
+    return _h
+
+
+@pytest_asyncio.fixture
 async def client(db):
     async def _override():
         yield db
