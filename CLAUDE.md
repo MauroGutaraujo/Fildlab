@@ -226,7 +226,7 @@ CREATE TABLE predicciones_rul (
     - [x] 3.1.2 Módulo de contratos y configuración SLA
     - [x] 3.1.3 Módulo de ventas
     - [x] 3.1.4 Módulo de inventario (Stock central y movimientos)
-    - [ ] 3.1.5 Módulo de equipos (Ficha técnica y series)
+    - [x] 3.1.5 Módulo de equipos (Ficha técnica y series)
     - [ ] 3.1.6 Liquidación de órdenes y notas de corrección (Adendas)
     - [x] 3.1.7 Control de accesos RBAC (Argon2 + JWT)
   - [ ] 3.2 PWA de Campo (Offline-First)
