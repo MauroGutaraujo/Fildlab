@@ -54,7 +54,7 @@ La solución se estructura bajo una política de presupuesto de infraestructura 
   - Entorno y Lenguaje: Python 3.12 con FastAPI (arquitectura monolítica asíncrona)[cite: 2, 3].
   - Validación de Esquemas: Pydantic v2.
   - Criptografía y Seguridad: Autenticación RBAC con JWT; derivación de contraseñas con Argon2 (parámetros OWASP); validación de integridad con SHA-256 para actas[cite: 2, 3].
-  - Alojamiento API: Contenedor Docker efímero en Koyeb (Límites: 512 MB de RAM, 0.1 vCPU)[cite: 2, 3]. Requiere endpoint liviano `/api/v1/healthz` para mitigar el arranque en frío (cold start) mediante healthchecks periódicos[cite: 2, 3].
+  - Alojamiento API: Contenedor Docker en Render, free tier (Límites: 512 MB de RAM, 0.1 vCPU)[cite: 2, 3]. Requiere endpoint liviano `/api/v1/healthz` para mitigar el arranque en frío (cold start, agravado en el free tier de Render por el spin-down tras 15 min de inactividad) mediante healthchecks periódicos[cite: 2, 3].
 
 - **Base de Datos Central:**
   - Motor: PostgreSQL serverless en Neon (conexión directa, connection pooling conservador)[cite: 2, 3].
@@ -237,7 +237,7 @@ CREATE TABLE predicciones_rul (
     - [x] 3.2.5 Módulo de firma digital en canvas (DPR=2) y geolocalización
   - [ ] 3.3 Despliegue del Sistema (Free Tier)
     - [ ] 3.3.1 Configuración de Neon PostgreSQL
-    - [ ] 3.3.2 Publicar API en Koyeb con Dockerfile optimizado
+    - [ ] 3.3.2 Publicar API en Render con Dockerfile optimizado
     - [ ] 3.3.3 Publicar PWA en Cloudflare Pages
 
 - [ ] **Fase 4: Integración Analítica y Pruebas**
