@@ -3,6 +3,7 @@ import { forwardRef, useImperativeHandle } from "react";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { OrdenForm } from "./OrdenForm";
+import { db } from "../../db/dexie";
 
 // react-signature-canvas usa signature_pad, que necesita un CanvasRenderingContext2D real
 // (jsdom no lo implementa). Se reemplaza por un doble mínimo que expone el mismo contrato
@@ -17,7 +18,7 @@ vi.mock("react-signature-canvas", () => ({
 
 describe("OrdenForm — lecturas de agua", () => {
   it("rechaza ph fuera de 0-14", async () => {
-    render(<OrdenForm />);
+    render(<OrdenForm contratoId={1} equipoSerie="RO-1" tecnicoId={2} />);
     const ph = screen.getByLabelText(/^ph/i);
     await userEvent.type(ph, "15");
     await userEvent.tab();
@@ -25,7 +26,7 @@ describe("OrdenForm — lecturas de agua", () => {
   });
 
   it("rechaza un valor negativo en TDS entrada", async () => {
-    render(<OrdenForm />);
+    render(<OrdenForm contratoId={1} equipoSerie="RO-1" tecnicoId={2} />);
     const campo = screen.getByLabelText(/tds.*entrada/i);
     await userEvent.type(campo, "-1");
     await userEvent.tab();
@@ -33,7 +34,7 @@ describe("OrdenForm — lecturas de agua", () => {
   });
 
   it("el boton de continuar sigue deshabilitado con lecturas incompletas", () => {
-    render(<OrdenForm />);
+    render(<OrdenForm contratoId={1} equipoSerie="RO-1" tecnicoId={2} />);
     expect(screen.getByRole("button", { name: /continuar/i })).toBeDisabled();
   });
 
@@ -49,7 +50,7 @@ describe("OrdenForm — lecturas de agua", () => {
   }
 
   it("cerrar orden sigue deshabilitado sin firma ni GPS aun con lecturas completas", async () => {
-    render(<OrdenForm />);
+    render(<OrdenForm contratoId={1} equipoSerie="RO-1" tecnicoId={2} />);
     await completarLecturasValidas();
     expect(screen.getByRole("button", { name: /cerrar orden/i })).toBeDisabled();
   });
@@ -57,10 +58,27 @@ describe("OrdenForm — lecturas de agua", () => {
   it("se habilita solo cuando lecturas + firma + gps estan completos", async () => {
     const getCurrentPosition = vi.fn((ok) => ok({ coords: { latitude: -8.11, longitude: -79.02 } }));
     vi.stubGlobal("navigator", { geolocation: { getCurrentPosition } });
-    render(<OrdenForm />);
+    render(<OrdenForm contratoId={1} equipoSerie="RO-1" tecnicoId={2} />);
     await completarLecturasValidas();
     await userEvent.click(screen.getByRole("button", { name: /obtener ubicación/i }));
     await userEvent.click(screen.getByTestId("firma-canvas"));
     expect(await screen.findByRole("button", { name: /cerrar orden/i })).toBeEnabled();
+  });
+
+  it("al cerrar, escribe la orden en ordenesLocal con estado_sync pendiente", async () => {
+    const getCurrentPosition = vi.fn((ok) => ok({ coords: { latitude: -8.11, longitude: -79.02 } }));
+    vi.stubGlobal("navigator", { geolocation: { getCurrentPosition } });
+    render(<OrdenForm contratoId={1} equipoSerie="RO-1" tecnicoId={2} />);
+    await completarLecturasValidas();
+    await userEvent.click(screen.getByRole("button", { name: /obtener ubicación/i }));
+    await userEvent.click(screen.getByTestId("firma-canvas"));
+    await userEvent.click(await screen.findByRole("button", { name: /cerrar orden/i }));
+    const guardadas = await db.ordenesLocal.toArray();
+    expect(guardadas).toHaveLength(1);
+    expect(guardadas[0]).toMatchObject({
+      contrato_id: 1, equipo_serie: "RO-1", tecnico_id: 2, estado_sync: "pendiente",
+      firma_base64: "data:image/png;base64,FIRMA", gps_latitud: -8.11, gps_longitud: -79.02,
+    });
+    expect(guardadas[0].lecturas_agua.tds_entrada_ppm).toBe(350);
   });
 });

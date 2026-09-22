@@ -1,7 +1,10 @@
 import { useState } from "react";
+import { db } from "../../db/dexie";
 import { CAMPOS_LECTURA_ORDEN, type CampoLectura, errorLectura } from "../../lib/validators";
 import { Firma } from "./Firma";
 import { useGps } from "./useGps";
+
+type Props = { contratoId: number; equipoSerie: string; tecnicoId: number; onCerrada?: () => void };
 
 const ETIQUETAS: Record<CampoLectura, string> = {
   tds_entrada_ppm: "TDS entrada (ppm)",
@@ -18,7 +21,7 @@ type Lecturas = Record<CampoLectura, string>;
 const vacias = (): Lecturas =>
   Object.fromEntries(CAMPOS_LECTURA_ORDEN.map((c) => [c, ""])) as Lecturas;
 
-export function OrdenForm() {
+export function OrdenForm({ contratoId, equipoSerie, tecnicoId, onCerrada }: Props) {
   const [lecturas, setLecturas] = useState<Lecturas>(vacias());
   const [tocado, setTocado] = useState<Partial<Record<CampoLectura, boolean>>>({});
   const [firma, setFirma] = useState<string | null>(null);
@@ -30,6 +33,28 @@ export function OrdenForm() {
   const lecturasCompletas = CAMPOS_LECTURA_ORDEN.every((c) => errores[c] === null);
   const gpsCompleto = gps.lat !== null && gps.lng !== null;
   const puedeCerrar = lecturasCompletas && firma !== null && gpsCompleto;
+
+  async function cerrarOrden() {
+    if (!puedeCerrar || firma === null || gps.lat === null || gps.lng === null) return;
+    const ahora = new Date().toISOString();
+    await db.ordenesLocal.add({
+      id: crypto.randomUUID(),
+      contrato_id: contratoId,
+      equipo_serie: equipoSerie,
+      tecnico_id: tecnicoId,
+      tipo_intervencion: "PREVENTIVO",
+      fecha_creacion_cliente: ahora,
+      lecturas_agua: Object.fromEntries(CAMPOS_LECTURA_ORDEN.map((c) => [c, Number(lecturas[c])])) as never,
+      firma_base64: firma,
+      gps_latitud: gps.lat,
+      gps_longitud: gps.lng,
+      repuestos_consumidos: [],
+      estado_sync: "pendiente",
+      creado_en_local: ahora,
+      intentos_sync: 0,
+    });
+    onCerrada?.();
+  }
 
   return (
     <section className="p-4">
@@ -72,7 +97,12 @@ export function OrdenForm() {
               </p>
             )}
           </div>
-          <button type="button" disabled={!puedeCerrar} className="rounded bg-emerald-700 px-4 py-2 text-white disabled:opacity-60">
+          <button
+            type="button"
+            disabled={!puedeCerrar}
+            onClick={cerrarOrden}
+            className="rounded bg-emerald-700 px-4 py-2 text-white disabled:opacity-60"
+          >
             Cerrar orden
           </button>
         </div>
