@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 import pytest
 from fastapi import Depends, FastAPI
 from httpx import ASGITransport, AsyncClient
@@ -98,3 +100,30 @@ async def test_rol_del_token_no_otorga_privilegios_si_la_bd_dice_otra_cosa(db, c
     async with AsyncClient(transport=ASGITransport(app=mini), base_url="http://t") as c:
         r = await c.get("/solo-gerencia", headers={"Authorization": f"Bearer {tok}"})
     assert r.status_code == 403
+
+
+def _exp_horas(token: str) -> float:
+    import jwt as pyjwt
+
+    from app.core.config import get_settings
+
+    payload = pyjwt.decode(token, get_settings().jwt_secret, algorithms=["HS256"])
+    return (datetime.fromtimestamp(payload["exp"], tz=timezone.utc) - datetime.now(timezone.utc)).total_seconds() / 3600
+
+
+async def test_login_duracion_turno_emite_token_de_12_horas(client, crear_usuario):
+    await crear_usuario("TECNICO", email="t@x.pe", password="pw-correcta")
+    r = await client.post("/api/v1/auth/login", json={"email": "t@x.pe", "password": "pw-correcta", "duracion": "turno"})
+    assert 11.9 < _exp_horas(r.json()["access_token"]) <= 12.0
+
+
+async def test_login_sin_duracion_sigue_siendo_60_min(client, crear_usuario):
+    await crear_usuario("TECNICO", email="t2@x.pe", password="pw-correcta")
+    r = await client.post("/api/v1/auth/login", json={"email": "t2@x.pe", "password": "pw-correcta"})
+    assert 0.9 < _exp_horas(r.json()["access_token"]) <= 1.0
+
+
+async def test_login_duracion_turno_password_incorrecto_401_sin_emitir_token(client, crear_usuario):
+    await crear_usuario("TECNICO", email="t3@x.pe", password="pw-correcta")
+    r = await client.post("/api/v1/auth/login", json={"email": "t3@x.pe", "password": "mala", "duracion": "turno"})
+    assert r.status_code == 401 and "access_token" not in r.json()

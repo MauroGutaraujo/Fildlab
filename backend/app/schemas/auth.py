@@ -1,9 +1,13 @@
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict
 
 
 class LoginIn(BaseModel):
     email: str
     password: str
+    # "turno": sesion extendida de 12h para tecnicos de campo sin senal (3.2).
+    duracion: Literal["normal", "turno"] = "normal"
 
 
 class TokenOut(BaseModel):
