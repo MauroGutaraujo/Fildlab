@@ -236,8 +236,8 @@ CREATE TABLE predicciones_rul (
     - [x] 3.2.4 Inventario móvil en dispositivo (Descuento local inmediato)
     - [x] 3.2.5 Módulo de firma digital en canvas (DPR=2) y geolocalización
   - [ ] 3.3 Despliegue del Sistema (Free Tier)
-    - [ ] 3.3.1 Configuración de Neon PostgreSQL
-    - [ ] 3.3.2 Publicar API en Render con Dockerfile optimizado
+    - [x] 3.3.1 Configuración de Neon PostgreSQL
+    - [x] 3.3.2 Publicar API en Render con Dockerfile optimizado
     - [ ] 3.3.3 Publicar PWA en Cloudflare Pages
 
 - [ ] **Fase 4: Integración Analítica y Pruebas**
