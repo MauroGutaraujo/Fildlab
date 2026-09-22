@@ -29,13 +29,23 @@ class ContratoNoEncontrado(OrdenSyncError):
 
 
 def payload_raw_canonico(datos: OrdenSincronizarIn) -> str:
-    """Serializacion deterministica de las lecturas de agua: mismo contenido -> mismo string,
-    sin importar el orden de las claves recibidas (json.dumps con sort_keys)."""
+    """Serializacion deterministica del contenido probatorio del acta (RN-04): mismo contenido
+    -> mismo string, sin importar el orden de las claves recibidas (json.dumps con sort_keys).
+
+    Incluye id/tecnico/contrato/firma/GPS ademas de las lecturas: sin esto, alguien con acceso
+    a la BD podria sustituir la firma o mover el GPS sin invalidar el hash, y dos ordenes
+    distintas con las mismas lecturas producirian el mismo hash_sha256."""
     cuerpo = {
+        "id": str(datos.id),
+        "contrato_id": datos.contrato_id,
         "equipo_serie": datos.equipo_serie,
+        "tecnico_id": datos.tecnico_id,
         "tipo_intervencion": datos.tipo_intervencion,
         "fecha_creacion_cliente": datos.fecha_creacion_cliente.isoformat(),
         "lecturas_agua": datos.lecturas_agua.model_dump(),
+        "firma_base64": datos.firma_base64,
+        "gps_latitud": str(datos.gps_latitud),
+        "gps_longitud": str(datos.gps_longitud),
     }
     return json.dumps(cuerpo, sort_keys=True)
 
@@ -61,6 +71,11 @@ async def sincronizar_orden(session: AsyncSession, datos: OrdenSincronizarIn, us
         raise EquipoNoEncontrado(datos.equipo_serie)
 
     async with session.begin_nested():
+        # Bloquea la fila del equipo: sin esto, dos sincronizaciones concurrentes del mismo
+        # equipo (dos tecnicos, o el mismo en dos dispositivos) leerian el mismo previous_hash
+        # y bifurcarian la cadena (Review Focus 2 bajo concurrencia real).
+        await session.execute(select(Equipo).where(Equipo.serie == datos.equipo_serie).with_for_update())
+
         orden = OrdenServicio(
             id=datos.id,
             contrato_id=datos.contrato_id,
@@ -79,7 +94,7 @@ async def sincronizar_orden(session: AsyncSession, datos: OrdenSincronizarIn, us
                 select(ActaInmutable.hash_sha256)
                 .join(OrdenServicio, ActaInmutable.orden_id == OrdenServicio.id)
                 .where(OrdenServicio.equipo_serie == datos.equipo_serie, OrdenServicio.id != orden.id)
-                .order_by(ActaInmutable.creado_en.desc())
+                .order_by(ActaInmutable.creado_en.desc(), ActaInmutable.id.desc())
                 .limit(1)
             )
         ).scalar_one_or_none()

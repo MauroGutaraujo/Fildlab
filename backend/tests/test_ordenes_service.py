@@ -41,10 +41,42 @@ def _datos(tecnico_id, contrato_id, **over):
     return OrdenSincronizarIn(**base)
 
 
-def test_payload_canonico_es_deterministico_sin_importar_orden_de_claves():
-    a = payload_raw_canonico(_datos(1, 1))
-    b = payload_raw_canonico(_datos(1, 1))
+def test_payload_canonico_es_deterministico_para_el_mismo_contenido():
+    id_fijo, fecha_fija = uuid.uuid4(), datetime.now(timezone.utc)
+    a = payload_raw_canonico(_datos(1, 1, id=id_fijo, fecha_creacion_cliente=fecha_fija))
+    b = payload_raw_canonico(_datos(1, 1, id=id_fijo, fecha_creacion_cliente=fecha_fija))
     assert a == b
+
+
+def test_payload_canonico_cambia_si_cambia_la_firma():
+    """RN-04: la firma es parte de lo que se hashea; si no, se podria sustituir sin invalidar el hash."""
+    id_fijo, fecha_fija = uuid.uuid4(), datetime.now(timezone.utc)
+    a = payload_raw_canonico(_datos(1, 1, id=id_fijo, fecha_creacion_cliente=fecha_fija, firma_base64="AAAA"))
+    b = payload_raw_canonico(_datos(1, 1, id=id_fijo, fecha_creacion_cliente=fecha_fija, firma_base64="BBBB"))
+    assert a != b
+
+
+def test_payload_canonico_cambia_si_cambia_el_gps():
+    id_fijo, fecha_fija = uuid.uuid4(), datetime.now(timezone.utc)
+    a = payload_raw_canonico(_datos(1, 1, id=id_fijo, fecha_creacion_cliente=fecha_fija, gps_latitud="-8.0000000"))
+    b = payload_raw_canonico(_datos(1, 1, id=id_fijo, fecha_creacion_cliente=fecha_fija, gps_latitud="-9.0000000"))
+    assert a != b
+
+
+def test_payload_canonico_cambia_si_cambia_el_tecnico():
+    id_fijo, fecha_fija = uuid.uuid4(), datetime.now(timezone.utc)
+    a = payload_raw_canonico(_datos(1, 1, id=id_fijo, fecha_creacion_cliente=fecha_fija))
+    b = payload_raw_canonico(_datos(2, 1, id=id_fijo, fecha_creacion_cliente=fecha_fija))
+    assert a != b
+
+
+def test_payload_canonico_cambia_si_cambia_el_id_de_la_orden():
+    """Sin esto, dos ordenes distintas del mismo equipo con las mismas lecturas producen
+    el mismo hash_sha256 y el hash deja de identificar el acta."""
+    fecha_fija = datetime.now(timezone.utc)
+    a = payload_raw_canonico(_datos(1, 1, fecha_creacion_cliente=fecha_fija))
+    b = payload_raw_canonico(_datos(1, 1, fecha_creacion_cliente=fecha_fija))
+    assert a != b  # solo el id (generado distinto por _datos) cambia aqui
 
 
 async def test_sincronizar_orden_nueva_crea_orden_y_acta(db, escenario, crear_usuario):
@@ -61,8 +93,9 @@ async def test_sincronizar_dos_veces_mismo_id_es_idempotente(db, escenario, crea
     o1 = await sincronizar_orden(db, datos, tec)
     o2 = await sincronizar_orden(db, datos, tec)
     assert o1.id == o2.id
-    total = (await db.execute(select(func.count()).select_from(OrdenServicio))).scalar()
-    assert total == 1
+    assert (await db.execute(select(func.count()).select_from(OrdenServicio))).scalar() == 1
+    assert (await db.execute(select(func.count()).select_from(ActaInmutable))).scalar() == 1
+    assert (await db.execute(select(func.count()).select_from(MovimientoInventario))).scalar() == 0
 
 
 async def test_segunda_orden_del_mismo_equipo_encadena_hash(db, escenario, crear_usuario):
@@ -124,3 +157,61 @@ async def test_gerencia_puede_sincronizar_a_nombre_de_cualquier_tecnico(db, esce
     ger = await crear_usuario("GERENCIA")
     orden = await sincronizar_orden(db, _datos(tec.id, escenario.id), ger)
     assert orden.tecnico_id == tec.id
+
+
+async def test_dos_sincronizaciones_concurrentes_del_mismo_equipo_no_bifurcan_el_encadenado(engine):
+    """Review Focus 2 bajo concurrencia real: dos sesiones distintas sincronizando el mismo
+    equipo casi al mismo tiempo no deben leer el mismo previous_hash (eso bifurcaria la cadena)."""
+    import asyncio
+    from datetime import date
+
+    from sqlalchemy.ext.asyncio import AsyncSession
+
+    from app.core.security import hash_password
+    from app.models.cliente import Cliente
+    from app.models.contrato import Contrato
+    from app.models.equipo import Equipo
+    from app.models.usuario import Usuario
+
+    ruc = "20977777701"
+    async with AsyncSession(engine, expire_on_commit=False) as s:
+        s.add(Cliente(ruc=ruc, razon_social="x", direccion="y"))
+        c = Contrato(cliente_ruc=ruc, fecha_inicio=date(2026, 1, 1), fecha_fin=date(2026, 12, 31), monto_mensual_soles=100)
+        s.add(c)
+        await s.flush()
+        s.add(Equipo(serie="RO-CONC", cliente_ruc=ruc, contrato_id=c.id, tipo_sistema="OSMOSIS_INVERSA",
+                     fecha_instalacion=date(2026, 1, 2), parametros_nominales={"x": 1}))
+        tec = Usuario(nombre="Conc", email="conc-orden@test.pe", password_hash=hash_password("x"), rol="TECNICO")
+        s.add(tec)
+        await s.commit()
+        contrato_id, tecnico_id = c.id, tec.id
+
+    async def sincronizar():
+        async with AsyncSession(engine, expire_on_commit=False) as s:
+            tec_local = await s.get(Usuario, tecnico_id)
+            orden = await sincronizar_orden(s, _datos(tecnico_id, contrato_id, equipo_serie="RO-CONC"), tec_local)
+            await s.commit()
+            return orden.id
+
+    try:
+        id1, id2 = await asyncio.gather(sincronizar(), sincronizar())
+        async with AsyncSession(engine) as s:
+            a1 = (await s.execute(select(ActaInmutable).where(ActaInmutable.orden_id == id1))).scalar_one()
+            a2 = (await s.execute(select(ActaInmutable).where(ActaInmutable.orden_id == id2))).scalar_one()
+            # Exactamente una es la "primera" (previous_hash NULL) y la otra encadena con ella.
+            # Si el lock fallara, ambas leerian NULL (cadena bifurcada) o ninguna encadenaria bien.
+            primeras = [a for a in (a1, a2) if a.previous_hash is None]
+            segundas = [a for a in (a1, a2) if a.previous_hash is not None]
+            assert len(primeras) == 1 and len(segundas) == 1
+            assert segundas[0].previous_hash == primeras[0].hash_sha256
+    finally:
+        async with AsyncSession(engine) as s:
+            from sqlalchemy import delete
+
+            await s.execute(delete(ActaInmutable).where(ActaInmutable.orden_id.in_([id1, id2])))
+            await s.execute(delete(OrdenServicio).where(OrdenServicio.id.in_([id1, id2])))
+            await s.execute(delete(Equipo).where(Equipo.serie == "RO-CONC"))
+            await s.execute(delete(Contrato).where(Contrato.id == contrato_id))
+            await s.execute(delete(Usuario).where(Usuario.id == tecnico_id))
+            await s.execute(delete(Cliente).where(Cliente.ruc == ruc))
+            await s.commit()

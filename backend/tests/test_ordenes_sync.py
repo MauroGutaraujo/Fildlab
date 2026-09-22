@@ -71,6 +71,15 @@ async def test_post_ordenes_gps_invalido_422(client, crear_usuario, auth_headers
     assert r.status_code == 422
 
 
+async def test_post_ordenes_gps_fuera_de_rango_422(client, crear_usuario, auth_headers, crear_cliente, db):
+    tec = await crear_usuario("TECNICO")
+    cid = await _preparar(crear_cliente, db)
+    r = await client.post("/api/v1/ordenes", json=_body(tec.id, cid, gps_latitud="500"), headers=auth_headers(tec))
+    assert r.status_code == 422
+    r = await client.post("/api/v1/ordenes", json=_body(tec.id, cid, gps_longitud="-500"), headers=auth_headers(tec))
+    assert r.status_code == 422
+
+
 async def test_post_ordenes_stock_insuficiente_409(client, crear_usuario, auth_headers, crear_cliente, db):
     from app.models.repuesto import Repuesto
     tec = await crear_usuario("TECNICO")
