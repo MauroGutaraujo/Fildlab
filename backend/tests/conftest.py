@@ -76,6 +76,16 @@ def auth_headers():
 
 
 @pytest_asyncio.fixture
+async def gerente_h(crear_usuario, auth_headers):
+    return auth_headers(await crear_usuario("GERENCIA"))
+
+
+@pytest_asyncio.fixture
+async def tecnico_h(crear_usuario, auth_headers):
+    return auth_headers(await crear_usuario("TECNICO"))
+
+
+@pytest_asyncio.fixture
 async def client(db):
     async def _override():
         yield db

@@ -77,7 +77,15 @@ La solución se estructura bajo una política de presupuesto de infraestructura 
 ## 4. REGLAS DE NEGOCIO CRÍTICAS (SRS)
 - **RN-01 (Jerarquía de Aprobación):** Privilegio exclusivo de la Gerencia General para crear, actualizar o anular clientes, contratos y configuración de SLAs. Los operarios de campo tienen privilegios estrictos de solo lectura sobre estas entidades[cite: 3].
 - **RN-02 (Cierre Obligatorio de Órdenes en Campo):** La PWA bloquea el cierre de cualquier orden técnica si no se cuenta con:
-  1. Lectura obligatoria de parámetros físico-químicos del agua (pH, conductividad, presión)[cite: 3].
+  1. Lectura obligatoria de parámetros físico-químicos y volumétricos del agua:
+     - Sólidos disueltos del agua de entrada (TDS Entrada - ppm / mg/L)[cite: 3].
+     - Sólidos disueltos post membrana (TDS Post-Membrana - ppm / mg/L)[cite: 3].
+     - Sólidos disueltos de producto final (TDS Producto Final - ppm / mg/L)[cite: 3].
+     - pH (acidez/alcalinidad)[cite: 3].
+     - Conductividad eléctrica (μS/cm)[cite: 3].
+     - Resistividad (MΩ·cm)[cite: 3].
+     - Litros consumidos de la red (agua cruda de entrada)[cite: 3].
+     - Litros totales de agua pura (agua permeada / tratada)[cite: 3].
   2. Firma digital manuscrita capturada en pantalla táctil[cite: 3].
   3. Metadatos de validación: coordenadas GPS (latitud/longitud) y doble marca de tiempo (estampado local y del servidor)[cite: 3].
 - **RN-03 (Trazabilidad de Inventario en Dos Fases):**
@@ -95,7 +103,7 @@ La solución se estructura bajo una política de presupuesto de infraestructura 
 ### Requerimientos Funcionales (RF)
 - **REQ-01:** Registro, actualización y consulta de clientes con validación estricta de RUC (11 dígitos)[cite: 3].
 - **REQ-02:** Gestión de contratos de servicio asociando vigencias y tiempos de respuesta de SLA[cite: 3].
-- **REQ-03:** Ficha técnica de equipos de tratamiento de agua (serie, tipo: ósmosis inversa, ablandador o filtro, fecha de instalación y parámetros nominales)[cite: 3].
+- **REQ-03:** Ficha técnica de equipos de tratamiento de agua (serie, tipo: ósmosis inversa, ablandador o filtro, fecha de instalación y parámetros nominales de referencia: TDS entrada, TDS post-membrana, TDS producto final, pH, conductividad, resistividad, litros consumidos y litros de agua pura)[cite: 3].
 - **REQ-04:** Manejo de excepciones y bloqueo ante contratos o formularios incompletos[cite: 3].
 - **REQ-05:** Registro de entradas y salidas de repuestos asociadas obligatoriamente a órdenes de trabajo[cite: 3].
 - **REQ-06:** Control y descuento del stock local del técnico en Dexie.js con o sin conexión[cite: 3].
@@ -214,15 +222,15 @@ CREATE TABLE predicciones_rul (
 
 - [ ] **Fase 3: Núcleo Transaccional**
   - [ ] 3.1 Plataforma Web Central
-    - [ ] 3.1.1 Módulo de clientes (Validación RUC de 11 dígitos)
+    - [x] 3.1.1 Módulo de clientes (Validación RUC de 11 dígitos)
     - [ ] 3.1.2 Módulo de contratos y configuración SLA
     - [ ] 3.1.3 Módulo de ventas
     - [ ] 3.1.4 Módulo de inventario (Stock central y movimientos)
     - [ ] 3.1.5 Módulo de equipos (Ficha técnica y series)
     - [ ] 3.1.6 Liquidación de órdenes y notas de corrección (Adendas)
-    - [ ] 3.1.7 Control de accesos RBAC (Argon2 + JWT)
+    - [x] 3.1.7 Control de accesos RBAC (Argon2 + JWT)
   - [ ] 3.2 PWA de Campo (Offline-First)
-    - [ ] 3.2.1 Formulario de órdenes de servicio y lectura de agua
+    - [ ] 3.2.1 Formulario de órdenes de servicio y lectura de agua (TDS entrada/post-membrana/producto, pH, conductividad, resistividad, litros red y litros agua pura)
     - [ ] 3.2.2 Implementar modo offline con IndexedDB (Dexie.js)
     - [ ] 3.2.3 Servicio de sincronización Outbox con TanStack Query
     - [ ] 3.2.4 Inventario móvil en dispositivo (Descuento local inmediato)
