@@ -1,10 +1,28 @@
 import { useEffect, useState } from "react";
+import { QueryClient, QueryClientProvider, useMutation } from "@tanstack/react-query";
 import { decodeTecnicoId, obtenerToken } from "./auth/session";
 import { LoginTurno } from "./auth/LoginTurno";
 import { buscarEquipos, refrescarCatalogo } from "./db/catalogo";
 import type { CatalogoItem } from "./db/dexie";
+import { procesarOutbox } from "./db/outbox";
 import { OrdenForm } from "./features/orden/OrdenForm";
 import { StockMovil } from "./features/stock/StockMovil";
+
+const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+function BotonSincronizar() {
+  const sync = useMutation({ mutationFn: procesarOutbox });
+  return (
+    <button
+      type="button"
+      onClick={() => sync.mutate()}
+      disabled={sync.isPending}
+      className="text-sky-700 hover:underline disabled:opacity-60"
+    >
+      {sync.isPending ? "Sincronizando…" : "Sincronizar ahora"}
+    </button>
+  );
+}
 
 type EquipoDatos = { serie: string; contrato_id: number };
 
@@ -47,6 +65,14 @@ function EquipoPicker({ onElegido }: { onElegido: (equipo: EquipoDatos) => void 
 }
 
 export function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <AppInterna />
+    </QueryClientProvider>
+  );
+}
+
+function AppInterna() {
   const [token, setToken] = useState<string | null>(null);
   const [cargando, setCargando] = useState(true);
   const [equipo, setEquipo] = useState<EquipoDatos | null>(null);
@@ -80,6 +106,7 @@ export function App() {
   return (
     <>
       <nav className="flex justify-end gap-3 p-2 text-sm">
+        <BotonSincronizar />
         <button type="button" onClick={() => setPantalla("stock")} className="text-sky-700 hover:underline">
           Stock móvil
         </button>

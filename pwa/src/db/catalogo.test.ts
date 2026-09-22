@@ -34,4 +34,9 @@ describe("catalogo local", () => {
     await refrescarCatalogo();
     expect(await db.catalogoLocal.get("RO-1")).toBeDefined();
   });
+
+  it("una respuesta con forma inesperada (no un arreglo) no revienta la sincronizacion", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ detail: "error" }), { status: 200 }));
+    await expect(refrescarCatalogo()).resolves.not.toThrow();
+  });
 });

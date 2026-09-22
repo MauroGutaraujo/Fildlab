@@ -229,12 +229,12 @@ CREATE TABLE predicciones_rul (
     - [x] 3.1.5 Módulo de equipos (Ficha técnica y series)
     - [x] 3.1.6 Liquidación de órdenes y notas de corrección (Adendas)
     - [x] 3.1.7 Control de accesos RBAC (Argon2 + JWT)
-  - [ ] 3.2 PWA de Campo (Offline-First)
-    - [ ] 3.2.1 Formulario de órdenes de servicio y lectura de agua (TDS entrada/post-membrana/producto, pH, conductividad, resistividad, litros red y litros agua pura)
-    - [ ] 3.2.2 Implementar modo offline con IndexedDB (Dexie.js)
-    - [ ] 3.2.3 Servicio de sincronización Outbox con TanStack Query
-    - [ ] 3.2.4 Inventario móvil en dispositivo (Descuento local inmediato)
-    - [ ] 3.2.5 Módulo de firma digital en canvas (DPR=2) y geolocalización
+  - [x] 3.2 PWA de Campo (Offline-First)
+    - [x] 3.2.1 Formulario de órdenes de servicio y lectura de agua (TDS entrada/post-membrana/producto, pH, conductividad, resistividad, litros red y litros agua pura)
+    - [x] 3.2.2 Implementar modo offline con IndexedDB (Dexie.js)
+    - [x] 3.2.3 Servicio de sincronización Outbox con TanStack Query
+    - [x] 3.2.4 Inventario móvil en dispositivo (Descuento local inmediato)
+    - [x] 3.2.5 Módulo de firma digital en canvas (DPR=2) y geolocalización
   - [ ] 3.3 Despliegue del Sistema (Free Tier)
     - [ ] 3.3.1 Configuración de Neon PostgreSQL
     - [ ] 3.3.2 Publicar API en Koyeb con Dockerfile optimizado

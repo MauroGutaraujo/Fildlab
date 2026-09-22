@@ -16,13 +16,15 @@ export async function refrescarCatalogo(): Promise<void> {
 
   const items: CatalogoItem[] = [];
   const ahora = new Date().toISOString();
-  if (clientes.status === "fulfilled") {
+  // Array.isArray: una respuesta inesperada (backend caído devolviendo HTML de error con
+  // status 200 detrás de un proxy, por ejemplo) no debe tumbar la sincronización entera.
+  if (clientes.status === "fulfilled" && Array.isArray(clientes.value)) {
     items.push(...clientes.value.map((c) => ({ id: c.ruc, tipo: "cliente" as const, datos: c, actualizado_en: ahora })));
   }
-  if (equipos.status === "fulfilled") {
+  if (equipos.status === "fulfilled" && Array.isArray(equipos.value)) {
     items.push(...equipos.value.map((e) => ({ id: e.serie, tipo: "equipo" as const, datos: e, actualizado_en: ahora })));
   }
-  if (contratos.status === "fulfilled") {
+  if (contratos.status === "fulfilled" && Array.isArray(contratos.value)) {
     items.push(
       ...contratos.value.map((c) => ({ id: String(c.id), tipo: "contrato" as const, datos: c, actualizado_en: ahora })),
     );
