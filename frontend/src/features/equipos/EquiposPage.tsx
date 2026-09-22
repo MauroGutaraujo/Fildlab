@@ -116,11 +116,11 @@ export function EquiposPage() {
           </SelectField>
           <FormField label="Fecha de instalación" type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} error={errores.fecha} />
           <TextAreaField
-            label="Parámetros nominales (JSON)"
+            label="Parámetros nominales (JSON) — REQ-03: TDS entrada/post-membrana/producto final, pH, conductividad, resistividad, litros de red y litros de agua pura"
             value={params}
             onChange={(e) => setParams(e.target.value)}
             rows={4}
-            placeholder='{"presion_psi": 60, "conductividad_us_cm": 15}'
+            placeholder='{"tds_entrada_ppm": 350, "tds_post_membrana_ppm": 8, "tds_producto_final_ppm": 5, "ph": 7.0, "conductividad_us_cm": 15, "resistividad_mohm_cm": 1.2, "litros_consumidos_red": 500, "litros_agua_pura": 420}'
             error={errores.params}
           />
         </FormPanel>

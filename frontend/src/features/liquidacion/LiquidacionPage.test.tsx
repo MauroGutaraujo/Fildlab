@@ -134,6 +134,42 @@ describe("LiquidacionPage", () => {
     expect(posts(f)).toHaveLength(0);
   });
 
+  it("muestra el acta en solo lectura al abrir la adenda", async () => {
+    mockApi([
+      { path: "/api/v1/ordenes", body: [ORDEN] },
+      { path: `/api/v1/ordenes/${ID}/adendas`, body: [] },
+      {
+        path: `/api/v1/ordenes/${ID}/acta`,
+        body: {
+          orden_id: ID,
+          payload_raw: '{"ph": 7.1}',
+          hash_sha256: "a".repeat(64),
+          previous_hash: null,
+          firma_base64: "AAAA",
+          gps_latitud: "-8.1116000",
+          gps_longitud: "-79.0288000",
+          creado_en: "2026-03-01T10:00:00Z",
+        },
+      },
+    ]);
+    renderWithProviders(<LiquidacionPage />);
+    await userEvent.click(await screen.findByRole("button", { name: /adenda/i }));
+    expect(await screen.findByText(/a{64}/)).toBeInTheDocument();
+    expect(screen.getByText(/-8.1116000/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /editar acta/i })).not.toBeInTheDocument();
+  });
+
+  it("si la orden no tiene acta aún, lo indica sin romper el panel de adenda", async () => {
+    mockApi([
+      { path: "/api/v1/ordenes", body: [ORDEN] },
+      { path: `/api/v1/ordenes/${ID}/adendas`, body: [] },
+      { path: `/api/v1/ordenes/${ID}/acta`, status: 404, body: { detail: "La orden aún no tiene acta sincronizada" } },
+    ]);
+    renderWithProviders(<LiquidacionPage />);
+    await userEvent.click(await screen.findByRole("button", { name: /adenda/i }));
+    expect(await screen.findByText(/sin acta sincronizada/i)).toBeInTheDocument();
+  });
+
   it("muestra las adendas previas de la orden", async () => {
     mockApi([
       { path: "/api/v1/ordenes", body: [ORDEN] },

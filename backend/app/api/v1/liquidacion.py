@@ -6,9 +6,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_session
 from app.core.deps import get_current_user, require_role
-from app.models.orden import AdendaCorreccion, OrdenServicio
+from app.models.orden import ActaInmutable, AdendaCorreccion, OrdenServicio
 from app.models.usuario import Usuario
-from app.schemas.liquidacion import AdendaIn, AdendaOut, EstadoOrden, OrdenOut
+from app.schemas.liquidacion import ActaOut, AdendaIn, AdendaOut, EstadoOrden, OrdenOut
 from app.services import inventario as inv
 from app.services import liquidacion as svc
 
@@ -44,6 +44,19 @@ async def liquidar(orden_id: uuid.UUID, session: AsyncSession = Depends(get_sess
         raise _no_encontrada() from None
     except svc.OrdenYaLiquidada:
         raise HTTPException(status.HTTP_409_CONFLICT, "La orden ya está liquidada") from None
+
+
+@router.get("/{orden_id}/acta", response_model=ActaOut)
+async def leer_acta(orden_id: uuid.UUID, session: AsyncSession = Depends(get_session)):
+    """RN-04: el acta es de solo lectura; no hay PUT/DELETE para ella (ver test_no_existen_endpoints_...)."""
+    if await session.get(OrdenServicio, orden_id) is None:
+        raise _no_encontrada()
+    acta = (
+        await session.execute(select(ActaInmutable).where(ActaInmutable.orden_id == orden_id))
+    ).scalar_one_or_none()
+    if acta is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "La orden aún no tiene acta sincronizada")
+    return acta
 
 
 @router.get("/{orden_id}/adendas", response_model=list[AdendaOut])

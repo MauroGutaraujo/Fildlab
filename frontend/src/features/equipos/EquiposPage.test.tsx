@@ -4,13 +4,26 @@ import userEvent from "@testing-library/user-event";
 import { EquiposPage } from "./EquiposPage";
 import { mockApi, renderWithProviders } from "../../test/utils";
 
+// REQ-03: los 8 parámetros de referencia (TDS entrada/post-membrana/producto final,
+// pH, conductividad, resistividad, litros de red y litros de agua pura).
+const PARAMS_REQ03 = {
+  tds_entrada_ppm: 350,
+  tds_post_membrana_ppm: 8,
+  tds_producto_final_ppm: 5,
+  ph: 7.0,
+  conductividad_us_cm: 15,
+  resistividad_mohm_cm: 1.2,
+  litros_consumidos_red: 500,
+  litros_agua_pura: 420,
+};
+
 const EQUIPO = {
   serie: "RO-2026-0001",
   cliente_ruc: "20612493821",
   contrato_id: null,
   tipo_sistema: "OSMOSIS_INVERSA",
   fecha_instalacion: "2026-01-15",
-  parametros_nominales: { presion_psi: 60 },
+  parametros_nominales: PARAMS_REQ03,
 };
 
 const posts = (f: ReturnType<typeof mockApi>) =>
@@ -21,7 +34,7 @@ async function llenar(o: { serie?: string; ruc?: string; fecha?: string; params?
   await userEvent.type(screen.getByLabelText(/RUC del cliente/i), o.ruc ?? "20612493821");
   if (o.tipo) await userEvent.selectOptions(screen.getByLabelText("Tipo de sistema"), o.tipo);
   fireEvent.change(screen.getByLabelText(/fecha de instalación/i), { target: { value: o.fecha ?? "2026-01-15" } });
-  fireEvent.change(screen.getByLabelText(/parámetros nominales/i), { target: { value: o.params ?? '{"presion_psi": 60}' } });
+  fireEvent.change(screen.getByLabelText(/parámetros nominales/i), { target: { value: o.params ?? JSON.stringify(PARAMS_REQ03) } });
 }
 
 describe("EquiposPage", () => {
@@ -30,7 +43,7 @@ describe("EquiposPage", () => {
     renderWithProviders(<EquiposPage />, { rol: "TECNICO" });
     expect(await screen.findByText("RO-2026-0001")).toBeInTheDocument();
     expect(screen.getByText("Ósmosis inversa")).toBeInTheDocument();
-    expect(screen.getByText(/presion_psi/)).toBeInTheDocument();
+    expect(screen.getByText(/tds_entrada_ppm/)).toBeInTheDocument();
   });
 
   it("TECNICO no ve acciones de escritura", async () => {
@@ -70,7 +83,7 @@ describe("EquiposPage", () => {
       cliente_ruc: "20612493821",
       tipo_sistema: "ABLANDADOR",
       fecha_instalacion: "2026-01-15",
-      parametros_nominales: { presion_psi: 60 },
+      parametros_nominales: PARAMS_REQ03,
     });
   });
 

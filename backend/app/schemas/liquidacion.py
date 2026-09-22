@@ -44,6 +44,19 @@ class AdendaIn(BaseModel):
     ajuste_repuestos: list[AjusteRepuesto] | None = None
 
 
+class ActaOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    orden_id: uuid.UUID
+    payload_raw: str
+    hash_sha256: str
+    previous_hash: str | None
+    firma_base64: str
+    gps_latitud: Decimal
+    gps_longitud: Decimal
+    creado_en: datetime
+
+
 class AdendaOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

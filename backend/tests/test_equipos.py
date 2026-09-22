@@ -5,12 +5,22 @@ import pytest
 from app.models.contrato import Contrato
 
 RUC = "20612493821"
+PARAMETROS_COMPLETOS = {
+    "tds_entrada_ppm": 350,
+    "tds_post_membrana_ppm": 8,
+    "tds_producto_final_ppm": 5,
+    "ph": 7.0,
+    "conductividad_us_cm": 15,
+    "resistividad_mohm_cm": 1.2,
+    "litros_consumidos_red": 500,
+    "litros_agua_pura": 420,
+}
 BODY = {
     "serie": "RO-2026-0001",
     "cliente_ruc": RUC,
     "tipo_sistema": "OSMOSIS_INVERSA",
     "fecha_instalacion": "2026-01-15",
-    "parametros_nominales": {"presion_psi": 60, "conductividad_us_cm": 15, "ph": 7.0},
+    "parametros_nominales": PARAMETROS_COMPLETOS,
 }
 
 
@@ -35,7 +45,7 @@ async def test_crear_equipo_osmosis_con_parametros_nominales_201(client, gerente
     assert r.status_code == 201
     b = r.json()
     assert b["serie"] == "RO-2026-0001" and b["tipo_sistema"] == "OSMOSIS_INVERSA"
-    assert b["parametros_nominales"]["presion_psi"] == 60 and b["contrato_id"] is None
+    assert b["parametros_nominales"]["tds_entrada_ppm"] == 350 and b["contrato_id"] is None
 
 
 @pytest.mark.parametrize("tipo", ["OSMOSIS_INVERSA", "ABLANDADOR", "FILTRO"])
@@ -64,6 +74,37 @@ async def test_parametros_nominales_obligatorios_y_no_vacios_422(client, gerente
     assert (await client.post("/api/v1/equipos", json=sin, headers=gerente_h)).status_code == 422
     assert (await client.post("/api/v1/equipos", json={**BODY, "parametros_nominales": {}}, headers=gerente_h)).status_code == 422
     assert (await client.post("/api/v1/equipos", json={**BODY, "parametros_nominales": [1]}, headers=gerente_h)).status_code == 422
+
+
+@pytest.mark.parametrize("campo", list(PARAMETROS_COMPLETOS.keys()))
+async def test_parametros_nominales_req03_todos_obligatorios_422(client, gerente_h, cliente, campo):
+    """REQ-03: TDS entrada/post-membrana/producto final, pH, conductividad, resistividad,
+    litros de red y litros de agua pura son obligatorios en la ficha técnica."""
+    incompleto = {k: v for k, v in PARAMETROS_COMPLETOS.items() if k != campo}
+    r = await client.post("/api/v1/equipos", json={**BODY, "parametros_nominales": incompleto}, headers=gerente_h)
+    assert r.status_code == 422
+
+
+async def test_ph_fuera_de_rango_422(client, gerente_h, cliente):
+    r = await client.post(
+        "/api/v1/equipos", json={**BODY, "parametros_nominales": {**PARAMETROS_COMPLETOS, "ph": 15}}, headers=gerente_h
+    )
+    assert r.status_code == 422
+
+
+async def test_parametro_negativo_422(client, gerente_h, cliente):
+    r = await client.post(
+        "/api/v1/equipos",
+        json={**BODY, "parametros_nominales": {**PARAMETROS_COMPLETOS, "tds_entrada_ppm": -1}},
+        headers=gerente_h,
+    )
+    assert r.status_code == 422
+
+
+async def test_parametros_nominales_admite_campos_adicionales(client, gerente_h, cliente):
+    extra = {**PARAMETROS_COMPLETOS, "presion_psi": 60}
+    r = await client.post("/api/v1/equipos", json={**BODY, "parametros_nominales": extra}, headers=gerente_h)
+    assert r.status_code == 201 and r.json()["parametros_nominales"]["presion_psi"] == 60
 
 
 async def test_cliente_inexistente_404_y_contrato_inexistente_404(client, gerente_h, cliente):
@@ -97,7 +138,7 @@ async def test_tecnico_lee_pero_no_escribe(client, gerente_h, tecnico_h, cliente
     await client.post("/api/v1/equipos", json=BODY, headers=gerente_h)
     assert (await client.get("/api/v1/equipos", headers=tecnico_h)).status_code == 200
     assert (await client.get(f"/api/v1/equipos/{BODY['serie']}", headers=tecnico_h)).status_code == 200
-    cambio = {"parametros_nominales": {"ph": 7.2}}
+    cambio = {"parametros_nominales": {**PARAMETROS_COMPLETOS, "ph": 7.2}}
     assert (await client.put(f"/api/v1/equipos/{BODY['serie']}", json=cambio, headers=tecnico_h)).status_code == 403
 
 
@@ -113,14 +154,19 @@ async def test_listar_filtra_por_cliente(client, gerente_h, cliente, crear_clien
 async def test_actualizar_parametros_y_contrato(client, gerente_h, cliente, crear_contrato):
     await client.post("/api/v1/equipos", json=BODY, headers=gerente_h)
     c = await crear_contrato()
-    r = await client.put(f"/api/v1/equipos/{BODY['serie']}", json={"parametros_nominales": {"ph": 7.2}, "contrato_id": c.id},
+    nuevos = {**PARAMETROS_COMPLETOS, "ph": 7.2}
+    r = await client.put(f"/api/v1/equipos/{BODY['serie']}", json={"parametros_nominales": nuevos, "contrato_id": c.id},
                          headers=gerente_h)
-    assert r.status_code == 200 and r.json()["parametros_nominales"] == {"ph": 7.2} and r.json()["contrato_id"] == c.id
+    assert r.status_code == 200 and r.json()["parametros_nominales"]["ph"] == 7.2 and r.json()["contrato_id"] == c.id
     vacio = await client.put(f"/api/v1/equipos/{BODY['serie']}", json={"parametros_nominales": {}}, headers=gerente_h)
     assert vacio.status_code == 422
+    incompleto = await client.put(
+        f"/api/v1/equipos/{BODY['serie']}", json={"parametros_nominales": {"ph": 7.2}}, headers=gerente_h
+    )
+    assert incompleto.status_code == 422
 
 
 async def test_equipo_inexistente_404_y_sin_token_401(client, gerente_h):
     assert (await client.get("/api/v1/equipos/NOPE", headers=gerente_h)).status_code == 404
-    assert (await client.put("/api/v1/equipos/NOPE", json={"parametros_nominales": {"a": 1}}, headers=gerente_h)).status_code == 404
+    assert (await client.put("/api/v1/equipos/NOPE", json={"parametros_nominales": PARAMETROS_COMPLETOS}, headers=gerente_h)).status_code == 404
     assert (await client.get("/api/v1/equipos")).status_code == 401

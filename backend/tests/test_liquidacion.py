@@ -152,9 +152,38 @@ async def test_no_existen_endpoints_para_editar_o_borrar_ordenes_ni_actas(client
     assert (await client.put(f"/api/v1/ordenes/{orden.id}", json={}, headers=gerente_h)).status_code == 405
     assert (await client.patch(f"/api/v1/ordenes/{orden.id}", json={}, headers=gerente_h)).status_code == 405
     assert (await client.delete(f"/api/v1/ordenes/{orden.id}", headers=gerente_h)).status_code == 405
-    assert (await client.put(f"/api/v1/ordenes/{orden.id}/acta", json={}, headers=gerente_h)).status_code == 404
-    assert (await client.delete(f"/api/v1/ordenes/{orden.id}/acta", headers=gerente_h)).status_code == 404
+    # El acta ahora tiene GET (I4 del review); PUT/DELETE siguen sin existir para ella (RN-04).
+    assert (await client.put(f"/api/v1/ordenes/{orden.id}/acta", json={}, headers=gerente_h)).status_code == 405
+    assert (await client.delete(f"/api/v1/ordenes/{orden.id}/acta", headers=gerente_h)).status_code == 405
 
 
 async def test_sin_token_401(client):
     assert (await client.get("/api/v1/ordenes")).status_code == 401
+
+
+async def test_leer_acta_de_la_orden(client, gerente_h, acta):
+    orden, a = acta
+    r = await client.get(f"/api/v1/ordenes/{orden.id}/acta", headers=gerente_h)
+    assert r.status_code == 200
+    b = r.json()
+    assert b["hash_sha256"] == a.hash_sha256
+    assert b["payload_raw"] == a.payload_raw
+    assert b["firma_base64"] == a.firma_base64
+    assert float(b["gps_latitud"]) == float(a.gps_latitud)
+    assert b["previous_hash"] is None
+
+
+async def test_leer_acta_de_orden_sin_acta_404(client, gerente_h, crear_orden):
+    o = await crear_orden()
+    r = await client.get(f"/api/v1/ordenes/{o.id}/acta", headers=gerente_h)
+    assert r.status_code == 404
+
+
+async def test_leer_acta_de_orden_inexistente_404(client, gerente_h):
+    r = await client.get(f"/api/v1/ordenes/{uuid.uuid4()}/acta", headers=gerente_h)
+    assert r.status_code == 404
+
+
+async def test_leer_acta_tecnico_tambien_puede(client, tecnico_h, acta):
+    orden, _ = acta
+    assert (await client.get(f"/api/v1/ordenes/{orden.id}/acta", headers=tecnico_h)).status_code == 200
