@@ -31,6 +31,31 @@ describe("DataTable", () => {
     expect(onEdit).toHaveBeenCalledWith({ id: 1, nombre: "Ana" });
   });
 
+  it("canEdit oculta «Editar» solo en las filas que no son editables", () => {
+    render(
+      <DataTable
+        columns={columns}
+        rows={[{ id: 1, nombre: "Ana" }, { id: 2, nombre: "Luis" }]}
+        rowKey={(f) => f.id}
+        onEdit={() => {}}
+        canEdit={(f) => f.id === 2}
+      />,
+    );
+    expect(screen.getAllByRole("button", { name: /editar/i })).toHaveLength(1);
+  });
+
+  it("renderiza acciones personalizadas por fila", () => {
+    render(
+      <DataTable
+        columns={columns}
+        rows={[{ id: 1, nombre: "Ana" }]}
+        rowKey={(f) => f.id}
+        actions={(f) => <button>Anular {f.nombre}</button>}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Anular Ana" })).toBeInTheDocument();
+  });
+
   it("muestra «Cargando…» mientras carga", () => {
     render(<DataTable columns={columns} rows={[]} rowKey={(f) => f.id} loading />);
     expect(screen.getByText(/cargando/i)).toBeInTheDocument();

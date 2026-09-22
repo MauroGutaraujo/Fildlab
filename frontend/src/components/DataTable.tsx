@@ -7,11 +7,14 @@ type Props<T> = {
   rows: T[];
   rowKey: (row: T) => string | number;
   onEdit?: (row: T) => void;
+  canEdit?: (row: T) => boolean;
+  actions?: (row: T) => ReactNode;
   loading?: boolean;
   error?: string | null;
 };
 
-export function DataTable<T>({ columns, rows, rowKey, onEdit, loading, error }: Props<T>) {
+export function DataTable<T>({ columns, rows, rowKey, onEdit, canEdit, actions, loading, error }: Props<T>) {
+  const hayAcciones = Boolean(onEdit || actions);
   if (error) {
     return (
       <p role="alert" className="rounded border border-red-200 bg-red-50 p-3 text-red-800">
@@ -32,7 +35,7 @@ export function DataTable<T>({ columns, rows, rowKey, onEdit, loading, error }: 
                 {c.header}
               </th>
             ))}
-            {onEdit && <th scope="col" className="px-3 py-2" />}
+            {hayAcciones && <th scope="col" className="px-3 py-2" />}
           </tr>
         </thead>
         <tbody>
@@ -43,11 +46,14 @@ export function DataTable<T>({ columns, rows, rowKey, onEdit, loading, error }: 
                   {c.cell(row)}
                 </td>
               ))}
-              {onEdit && (
-                <td className="px-3 py-2 text-right">
-                  <button type="button" onClick={() => onEdit(row)} className="text-sky-700 hover:underline">
-                    Editar
-                  </button>
+              {hayAcciones && (
+                <td className="space-x-3 px-3 py-2 text-right">
+                  {onEdit && (canEdit?.(row) ?? true) && (
+                    <button type="button" onClick={() => onEdit(row)} className="text-sky-700 hover:underline">
+                      Editar
+                    </button>
+                  )}
+                  {actions?.(row)}
                 </td>
               )}
             </tr>
