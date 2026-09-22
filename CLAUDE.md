@@ -225,7 +225,7 @@ CREATE TABLE predicciones_rul (
     - [x] 3.1.1 Módulo de clientes (Validación RUC de 11 dígitos)
     - [x] 3.1.2 Módulo de contratos y configuración SLA
     - [ ] 3.1.3 Módulo de ventas
-    - [ ] 3.1.4 Módulo de inventario (Stock central y movimientos)
+    - [x] 3.1.4 Módulo de inventario (Stock central y movimientos)
     - [ ] 3.1.5 Módulo de equipos (Ficha técnica y series)
     - [ ] 3.1.6 Liquidación de órdenes y notas de corrección (Adendas)
     - [x] 3.1.7 Control de accesos RBAC (Argon2 + JWT)

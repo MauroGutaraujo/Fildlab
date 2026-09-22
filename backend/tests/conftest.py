@@ -89,6 +89,38 @@ async def crear_cliente(db):
 
 
 @pytest_asyncio.fixture
+async def crear_orden(db, crear_usuario, crear_cliente):
+    """Órdenes las crea la PWA (Fase 3.2): en 3.1 se insertan por fixture (ruling D5)."""
+    import uuid
+    from datetime import date, datetime, timezone
+
+    from app.models.contrato import Contrato
+    from app.models.equipo import Equipo
+    from app.models.orden import OrdenServicio
+
+    async def _crear(estado="COMPROMETIDA", ruc="20612493821"):
+        if await db.get(__import__("app.models.cliente", fromlist=["Cliente"]).Cliente, ruc) is None:
+            await crear_cliente(ruc)
+        tecnico = await crear_usuario("TECNICO")
+        contrato = Contrato(cliente_ruc=ruc, fecha_inicio=date(2026, 1, 1), fecha_fin=date(2026, 12, 31),
+                            monto_mensual_soles=1000)
+        db.add(contrato)
+        await db.flush()
+        serie = f"SER-{uuid.uuid4().hex[:8]}"
+        db.add(Equipo(serie=serie, cliente_ruc=ruc, contrato_id=contrato.id, tipo_sistema="OSMOSIS_INVERSA",
+                      fecha_instalacion=date(2026, 1, 2), parametros_nominales={"presion_psi": 60}))
+        await db.flush()
+        o = OrdenServicio(id=uuid.uuid4(), contrato_id=contrato.id, equipo_serie=serie, tecnico_id=tecnico.id,
+                          tipo_intervencion="PREVENTIVO", estado=estado,
+                          fecha_creacion_cliente=datetime.now(timezone.utc))
+        db.add(o)
+        await db.flush()
+        return o
+
+    return _crear
+
+
+@pytest_asyncio.fixture
 async def gerente_h(crear_usuario, auth_headers):
     return auth_headers(await crear_usuario("GERENCIA"))
 
