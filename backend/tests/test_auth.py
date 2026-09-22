@@ -1,7 +1,6 @@
 import pytest
 from fastapi import Depends, FastAPI
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 
 from app.core import db as dbmod

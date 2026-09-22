@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 os.environ.setdefault("JWT_SECRET", "test-secret-no-usar-en-produccion-0123456789")
+_database_url_original = os.environ.get("DATABASE_URL", "")
 os.environ["DATABASE_URL"] = os.environ.get("DATABASE_URL_TEST", "")
 
 import pytest_asyncio  # noqa: E402
@@ -14,6 +15,9 @@ from sqlalchemy import text  # noqa: E402
 from sqlalchemy.ext.asyncio import AsyncSession  # noqa: E402
 
 from app.core import db as dbmod  # noqa: E402
+from app.core.db import assert_distinct_test_database  # noqa: E402
+
+assert_distinct_test_database(_database_url_original, os.environ.get("DATABASE_URL_TEST", ""))
 from app.main import app  # noqa: E402
 from app.models import Base  # noqa: E402
 

@@ -5,6 +5,19 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from app.core.config import get_settings, normalize_async_url
 
 
+def assert_distinct_test_database(database_url: str, database_url_test: str) -> None:
+    """Salvaguarda para el fixture de tests: éste hace DROP SCHEMA public CASCADE contra
+    DATABASE_URL_TEST. `DATABASE_URL` y `DATABASE_URL_TEST` conviven en el mismo `.env`;
+    si por un copiar-pegar terminan siendo la misma URL, `pytest` borraría producción."""
+    a, b = database_url.strip(), database_url_test.strip()
+    if a and b and a == b:
+        raise RuntimeError(
+            "DATABASE_URL_TEST es la misma URL que DATABASE_URL. "
+            "Los tests hacen DROP SCHEMA sobre DATABASE_URL_TEST: revisa backend/.env "
+            "y apunta DATABASE_URL_TEST a una rama de Neon distinta antes de correr pytest."
+        )
+
+
 def make_engine(url: str) -> AsyncEngine:
     """Pool conservador: Koyeb (512 MB) + Neon serverless."""
     async_url, connect_args = normalize_async_url(url)

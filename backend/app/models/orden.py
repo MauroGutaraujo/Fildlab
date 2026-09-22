@@ -20,7 +20,7 @@ class OrdenServicio(Base):
     equipo_serie: Mapped[str | None] = mapped_column(String(50), ForeignKey("equipos.serie"))
     tecnico_id: Mapped[int | None] = mapped_column(ForeignKey("usuarios.id"))
     tipo_intervencion: Mapped[str] = mapped_column(String(30))
-    estado: Mapped[str] = mapped_column(String(20), server_default="SINCRONIZADA", default="SINCRONIZADA")
+    estado: Mapped[str] = mapped_column(String(20), server_default="SINCRONIZADA", default="SINCRONIZADA", index=True)
     fecha_creacion_cliente: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     fecha_sincronizacion: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     tiempo_respuesta_horas: Mapped[Decimal | None] = mapped_column(Numeric(5, 2))

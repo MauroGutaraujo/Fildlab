@@ -35,7 +35,7 @@ class MovimientoInventario(Base):
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    repuesto_codigo: Mapped[str] = mapped_column(String(30), ForeignKey("repuestos.codigo"))
+    repuesto_codigo: Mapped[str] = mapped_column(String(30), ForeignKey("repuestos.codigo"), index=True)
     tipo: Mapped[str] = mapped_column(String(20))
     cantidad: Mapped[int]
     orden_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("ordenes_servicio.id"))

@@ -16,7 +16,7 @@ class Equipo(Base):
     )
 
     serie: Mapped[str] = mapped_column(String(50), primary_key=True)
-    cliente_ruc: Mapped[str] = mapped_column(String(11), ForeignKey("clientes.ruc"))
+    cliente_ruc: Mapped[str] = mapped_column(String(11), ForeignKey("clientes.ruc"), index=True)
     contrato_id: Mapped[int | None] = mapped_column(ForeignKey("contratos.id"))
     tipo_sistema: Mapped[str] = mapped_column(String(50))
     fecha_instalacion: Mapped[date] = mapped_column(Date)

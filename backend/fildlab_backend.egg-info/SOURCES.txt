@@ -1,6 +1,0 @@
-pyproject.toml
-fildlab_backend.egg-info/PKG-INFO
-fildlab_backend.egg-info/SOURCES.txt
-fildlab_backend.egg-info/dependency_links.txt
-fildlab_backend.egg-info/requires.txt
-fildlab_backend.egg-info/top_level.txt

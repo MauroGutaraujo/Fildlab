@@ -1,5 +1,4 @@
 import asyncio
-import os
 
 import pytest
 from sqlalchemy import delete, func, select

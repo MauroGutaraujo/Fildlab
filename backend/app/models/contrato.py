@@ -17,7 +17,7 @@ class Contrato(Base):
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    cliente_ruc: Mapped[str] = mapped_column(String(11), ForeignKey("clientes.ruc"))
+    cliente_ruc: Mapped[str] = mapped_column(String(11), ForeignKey("clientes.ruc"), index=True)
     fecha_inicio: Mapped[date] = mapped_column(Date)
     fecha_fin: Mapped[date] = mapped_column(Date)
     monto_mensual_soles: Mapped[Decimal] = mapped_column(Numeric(10, 2))
