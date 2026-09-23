@@ -22,9 +22,9 @@ function BotonSincronizar() {
       type="button"
       onClick={() => sync.mutate()}
       disabled={sync.isPending}
-      className="text-sky-700 hover:underline disabled:opacity-60"
+      className="rounded-lg bg-white/20 px-2.5 py-1 text-xs font-semibold text-white shadow-xs hover:bg-white/30 transition-colors disabled:opacity-60 cursor-pointer"
     >
-      {sync.isPending ? "Sincronizando…" : "Sincronizar ahora"}
+      {sync.isPending ? "Sincronizando…" : "Sincronizar"}
     </button>
   );
 }
@@ -129,22 +129,30 @@ function AppInterna() {
     );
   }
   return (
-    <>
-      <nav className="flex justify-end gap-3 p-2 text-sm">
-        <BotonSincronizar />
-        <button type="button" onClick={() => setPantalla("misOrdenes")} className="text-sky-700 hover:underline">
-          Mis órdenes
-        </button>
-        <button type="button" onClick={() => setPantalla("stock")} className="text-sky-700 hover:underline">
-          Stock móvil
-        </button>
-      </nav>
-      <EquipoPicker
-        onElegido={(e) => {
-          setEquipo(e);
-          setPantalla("orden");
-        }}
-      />
-    </>
+    <div className="min-h-screen bg-slate-50">
+      <header className="flex flex-wrap items-center justify-between gap-2 bg-gradient-to-r from-blue-700 via-blue-600 to-sky-500 px-4 py-2.5 text-white shadow-md">
+        <div className="flex items-center gap-2.5">
+          <img src="/logo.png" alt="Fildlab" className="h-8 w-8 rounded-xl shadow-xs border border-white/20 object-contain bg-white/10" />
+          <span className="text-lg font-bold tracking-tight text-white drop-shadow-sm">Fildlab Campo</span>
+        </div>
+        <nav className="flex items-center gap-2 text-xs font-medium">
+          <BotonSincronizar />
+          <button type="button" onClick={() => setPantalla("misOrdenes")} className="rounded-lg bg-white/10 px-2.5 py-1 text-white hover:bg-white/20 transition-colors">
+            Mis órdenes
+          </button>
+          <button type="button" onClick={() => setPantalla("stock")} className="rounded-lg bg-white/10 px-2.5 py-1 text-white hover:bg-white/20 transition-colors">
+            Stock móvil
+          </button>
+        </nav>
+      </header>
+      <main className="mx-auto max-w-lg">
+        <EquipoPicker
+          onElegido={(e) => {
+            setEquipo(e);
+            setPantalla("orden");
+          }}
+        />
+      </main>
+    </div>
   );
 }

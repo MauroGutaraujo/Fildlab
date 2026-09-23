@@ -26,21 +26,26 @@ export function LoginPage() {
   }
 
   return (
-    <main className="mx-auto mt-24 max-w-sm rounded-lg bg-white p-6 shadow">
-      <h1 className="mb-4 text-xl font-semibold">Fildlab · Ingreso</h1>
+    <main className="mx-auto mt-20 max-w-sm rounded-2xl bg-white p-8 shadow-xl border border-slate-100">
+      <div className="mb-6 flex flex-col items-center text-center">
+        <img src="/logo.png" alt="Fildlab" className="mb-3 h-16 w-16 rounded-2xl shadow-md border border-slate-100 object-contain" />
+        <h1 className="text-2xl font-bold tracking-tight text-slate-800">Fildlab</h1>
+        <p className="text-xs font-medium text-slate-500">Plataforma Administrativa de Tratamiento de Agua</p>
+      </div>
       <form onSubmit={enviar} className="space-y-4">
-        <label className="block text-sm">
-          Correo
+        <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider">
+          Correo Electrónico
           <input
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
             autoComplete="username"
-            className="mt-1 w-full rounded border border-slate-300 px-3 py-2"
+            placeholder="ejemplo@fildlab.pe"
+            className="mt-1.5 w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all"
           />
         </label>
-        <label className="block text-sm">
+        <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider">
           Contraseña
           <input
             type="password"
@@ -48,20 +53,21 @@ export function LoginPage() {
             onChange={(e) => setPassword(e.target.value)}
             required
             autoComplete="current-password"
-            className="mt-1 w-full rounded border border-slate-300 px-3 py-2"
+            placeholder="••••••••••••"
+            className="mt-1.5 w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all"
           />
         </label>
         {error && (
-          <p role="alert" className="text-sm text-red-700">
+          <p role="alert" className="rounded-lg bg-red-50 p-2.5 text-xs font-medium text-red-700 border border-red-200">
             {error}
           </p>
         )}
         <button
           type="submit"
           disabled={enviando}
-          className="w-full rounded bg-sky-700 px-4 py-2 text-white disabled:opacity-60"
+          className="w-full rounded-xl bg-gradient-to-r from-blue-600 via-blue-600 to-sky-500 py-3 text-sm font-semibold text-white shadow-md hover:from-blue-700 hover:to-sky-600 transition-all active:scale-[0.99] disabled:opacity-60 cursor-pointer"
         >
-          {enviando ? "Ingresando…" : "Ingresar"}
+          {enviando ? "Ingresando…" : "Ingresar a la Plataforma"}
         </button>
       </form>
     </main>
