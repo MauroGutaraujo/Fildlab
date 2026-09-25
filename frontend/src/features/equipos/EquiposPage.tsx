@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "../../api/client";
 import { useAuth } from "../../auth/AuthContext";
 import { DataTable } from "../../components/DataTable";
-import { FormField, SelectField, TextAreaField } from "../../components/FormField";
+import { FormField, SelectField } from "../../components/FormField";
 import { FormPanel } from "../../components/FormPanel";
 import { errorRuc, hoyISO, mensajeDe } from "../../lib/validators";
 
@@ -22,18 +22,34 @@ type Equipo = {
   fecha_instalacion: string;
   parametros_nominales: Record<string, unknown>;
 };
-type Errores = Partial<Record<"serie" | "ruc" | "fecha" | "params", string>>;
 
-const ERR_PARAMS = "Los parámetros nominales deben ser un objeto JSON no vacío";
+const CLAVES_PARAMETROS = [
+  "tdsEntrada",
+  "tdsPostMembrana",
+  "tdsProductoFinal",
+  "ph",
+  "conductividad",
+  "resistividad",
+  "litrosRed",
+  "litrosPura",
+] as const;
+type ClaveParametro = (typeof CLAVES_PARAMETROS)[number];
 
-function parseParametros(texto: string): Record<string, unknown> | null {
-  try {
-    const v: unknown = JSON.parse(texto);
-    if (v === null || typeof v !== "object" || Array.isArray(v) || Object.keys(v).length === 0) return null;
-    return v as Record<string, unknown>;
-  } catch {
-    return null;
-  }
+const PARAMETROS: { clave: ClaveParametro; campo: string; label: string; min?: number; max?: number }[] = [
+  { clave: "tdsEntrada", campo: "tds_entrada_ppm", label: "TDS entrada (ppm)" },
+  { clave: "tdsPostMembrana", campo: "tds_post_membrana_ppm", label: "TDS post-membrana (ppm)" },
+  { clave: "tdsProductoFinal", campo: "tds_producto_final_ppm", label: "TDS producto final (ppm)" },
+  { clave: "ph", campo: "ph", label: "pH", min: 0, max: 14 },
+  { clave: "conductividad", campo: "conductividad_us_cm", label: "Conductividad (μS/cm)" },
+  { clave: "resistividad", campo: "resistividad_mohm_cm", label: "Resistividad (MΩ·cm)" },
+  { clave: "litrosRed", campo: "litros_consumidos_red", label: "Litros consumidos (agua de red)" },
+  { clave: "litrosPura", campo: "litros_agua_pura", label: "Litros de agua pura" },
+];
+type Errores = Partial<Record<"serie" | "ruc" | "fecha" | ClaveParametro, string>>;
+
+function parseNumero(texto: string): number | null {
+  const v = Number(texto.trim());
+  return texto.trim() !== "" && Number.isFinite(v) ? v : null;
 }
 
 export function EquiposPage() {
@@ -46,7 +62,9 @@ export function EquiposPage() {
   const [ruc, setRuc] = useState("");
   const [tipo, setTipo] = useState<Tipo>("OSMOSIS_INVERSA");
   const [fecha, setFecha] = useState("");
-  const [params, setParams] = useState("");
+  const [params, setParams] = useState<Record<ClaveParametro, string>>(
+    () => Object.fromEntries(PARAMETROS.map((p) => [p.clave, ""])) as Record<ClaveParametro, string>,
+  );
   const [errores, setErrores] = useState<Errores>({});
 
   const crear = useMutation({
@@ -74,7 +92,7 @@ export function EquiposPage() {
     setRuc("");
     setTipo("OSMOSIS_INVERSA");
     setFecha("");
-    setParams("");
+    setParams(Object.fromEntries(PARAMETROS.map((p) => [p.clave, ""])) as Record<ClaveParametro, string>);
     setAbierto(true);
   }
 
@@ -86,10 +104,18 @@ export function EquiposPage() {
     if (r) e.ruc = r;
     if (!fecha) e.fecha = "La fecha de instalación es obligatoria";
     else if (fecha > hoyISO()) e.fecha = "La fecha de instalación no puede ser futura";
-    const parametros = parseParametros(params);
-    if (!parametros) e.params = ERR_PARAMS;
+
+    const parametros: Record<string, number> = {};
+    for (const p of PARAMETROS) {
+      const v = parseNumero(params[p.clave]);
+      if (v === null) e[p.clave] = "Ingresa un valor numérico";
+      else if (p.min !== undefined && v < p.min) e[p.clave] = `El valor mínimo es ${p.min}`;
+      else if (p.max !== undefined && v > p.max) e[p.clave] = `El valor máximo es ${p.max}`;
+      else parametros[p.campo] = v;
+    }
+
     setErrores(e);
-    if (Object.keys(e).length === 0 && parametros) crear.mutate(parametros);
+    if (Object.keys(e).length === 0) crear.mutate(parametros);
   }
 
   return (
@@ -115,14 +141,25 @@ export function EquiposPage() {
             ))}
           </SelectField>
           <FormField label="Fecha de instalación" type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} error={errores.fecha} />
-          <TextAreaField
-            label="Parámetros nominales (JSON) — REQ-03: TDS entrada/post-membrana/producto final, pH, conductividad, resistividad, litros de red y litros de agua pura"
-            value={params}
-            onChange={(e) => setParams(e.target.value)}
-            rows={4}
-            placeholder='{"tds_entrada_ppm": 350, "tds_post_membrana_ppm": 8, "tds_producto_final_ppm": 5, "ph": 7.0, "conductividad_us_cm": 15, "resistividad_mohm_cm": 1.2, "litros_consumidos_red": 500, "litros_agua_pura": 420}'
-            error={errores.params}
-          />
+
+          <div className="col-span-full">
+            <h3 className="text-sm font-bold text-slate-800">Parámetros nominales de referencia</h3>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Lecturas físico-químicas y volumétricas de fábrica que se usarán como referencia al comparar contra las lecturas registradas en cada orden de servicio.
+            </p>
+          </div>
+          {PARAMETROS.map((p) => (
+            <FormField
+              key={p.clave}
+              label={p.label}
+              type="number"
+              step="any"
+              inputMode="decimal"
+              value={params[p.clave]}
+              onChange={(e) => setParams((prev) => ({ ...prev, [p.clave]: e.target.value }))}
+              error={errores[p.clave]}
+            />
+          ))}
         </FormPanel>
       )}
 

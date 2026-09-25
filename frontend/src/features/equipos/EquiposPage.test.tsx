@@ -29,12 +29,28 @@ const EQUIPO = {
 const posts = (f: ReturnType<typeof mockApi>) =>
   f.mock.calls.filter(([, i]) => (i as RequestInit | undefined)?.method === "POST");
 
-async function llenar(o: { serie?: string; ruc?: string; fecha?: string; params?: string; tipo?: string } = {}) {
+const LABELS_PARAMS: Record<keyof typeof PARAMS_REQ03, RegExp> = {
+  tds_entrada_ppm: /tds entrada/i,
+  tds_post_membrana_ppm: /tds post-membrana/i,
+  tds_producto_final_ppm: /tds producto final/i,
+  ph: /^ph$/i,
+  conductividad_us_cm: /conductividad/i,
+  resistividad_mohm_cm: /resistividad/i,
+  litros_consumidos_red: /litros consumidos/i,
+  litros_agua_pura: /litros de agua pura/i,
+};
+
+async function llenar(
+  o: { serie?: string; ruc?: string; fecha?: string; params?: Partial<typeof PARAMS_REQ03>; tipo?: string } = {},
+) {
   await userEvent.type(screen.getByLabelText("Serie"), o.serie ?? "RO-1");
   await userEvent.type(screen.getByLabelText(/RUC del cliente/i), o.ruc ?? "20612493821");
   if (o.tipo) await userEvent.selectOptions(screen.getByLabelText("Tipo de sistema"), o.tipo);
   fireEvent.change(screen.getByLabelText(/fecha de instalación/i), { target: { value: o.fecha ?? "2026-01-15" } });
-  fireEvent.change(screen.getByLabelText(/parámetros nominales/i), { target: { value: o.params ?? JSON.stringify(PARAMS_REQ03) } });
+  const valores = { ...PARAMS_REQ03, ...o.params };
+  for (const [campo, regex] of Object.entries(LABELS_PARAMS)) {
+    fireEvent.change(screen.getByLabelText(regex), { target: { value: String(valores[campo as keyof typeof PARAMS_REQ03]) } });
+  }
 }
 
 describe("EquiposPage", () => {
@@ -87,17 +103,35 @@ describe("EquiposPage", () => {
     });
   });
 
-  it.each([
-    ["JSON inválido", "{presion:", /objeto JSON/i],
-    ["objeto vacío", "{}", /objeto JSON/i],
-    ["un arreglo", "[1,2]", /objeto JSON/i],
-  ])("parámetros nominales: %s se rechaza", async (_n, params, msg) => {
+  it("parámetros nominales: un campo vacío se rechaza", async () => {
     const f = mockApi([{ path: "/api/v1/equipos", body: [] }]);
     renderWithProviders(<EquiposPage />);
     await userEvent.click(await screen.findByRole("button", { name: /nuevo equipo/i }));
-    await llenar({ params });
+    await llenar();
+    fireEvent.change(screen.getByLabelText(/tds entrada/i), { target: { value: "" } });
     await userEvent.click(screen.getByRole("button", { name: /guardar/i }));
-    expect(await screen.findByText(msg)).toBeInTheDocument();
+    expect(await screen.findByText(/valor numérico/i)).toBeInTheDocument();
+    expect(posts(f)).toHaveLength(0);
+  });
+
+  it("parámetros nominales: un texto no numérico se rechaza", async () => {
+    const f = mockApi([{ path: "/api/v1/equipos", body: [] }]);
+    renderWithProviders(<EquiposPage />);
+    await userEvent.click(await screen.findByRole("button", { name: /nuevo equipo/i }));
+    await llenar();
+    fireEvent.change(screen.getByLabelText(/conductividad/i), { target: { value: "abc" } });
+    await userEvent.click(screen.getByRole("button", { name: /guardar/i }));
+    expect(await screen.findByText(/valor numérico/i)).toBeInTheDocument();
+    expect(posts(f)).toHaveLength(0);
+  });
+
+  it("parámetros nominales: pH fuera de 0-14 se rechaza", async () => {
+    const f = mockApi([{ path: "/api/v1/equipos", body: [] }]);
+    renderWithProviders(<EquiposPage />);
+    await userEvent.click(await screen.findByRole("button", { name: /nuevo equipo/i }));
+    await llenar({ params: { ph: 15 } });
+    await userEvent.click(screen.getByRole("button", { name: /guardar/i }));
+    expect(await screen.findByText(/valor máximo es 14/i)).toBeInTheDocument();
     expect(posts(f)).toHaveLength(0);
   });
 
