@@ -25,7 +25,9 @@ export function FormPanel({ title, onSubmit, onCancel, saving, error, children }
       <div className="grid gap-4 sm:grid-cols-2">{children}</div>
       {error && (
         <div role="alert" className="rounded-xl bg-red-50 border border-red-200/80 p-3 text-xs font-semibold text-red-700 flex items-center gap-2">
-          <span>⚠️</span>
+          <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v3.5m0 3.5h.01M10.29 3.86l-8.09 14A1 1 0 003.09 19h17.82a1 1 0 00.87-1.5l-8.09-14a1 1 0 00-1.74 0z" />
+          </svg>
           <span>{error}</span>
         </div>
       )}

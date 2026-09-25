@@ -1,13 +1,32 @@
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { Rol, useAuth } from "../auth/AuthContext";
 
-const ENLACES: { to: string; texto: string; icon: string; roles: Rol[] }[] = [
-  { to: "/clientes", texto: "Clientes", icon: "🏢", roles: ["GERENCIA", "TECNICO"] },
-  { to: "/contratos", texto: "Contratos", icon: "📄", roles: ["GERENCIA", "TECNICO"] },
-  { to: "/equipos", texto: "Equipos", icon: "💧", roles: ["GERENCIA", "TECNICO"] },
-  { to: "/inventario", texto: "Inventario", icon: "📦", roles: ["GERENCIA", "TECNICO"] },
-  { to: "/ventas", texto: "Ventas", icon: "💼", roles: ["GERENCIA"] },
-  { to: "/liquidacion", texto: "Liquidación", icon: "⚖️", roles: ["GERENCIA"] },
+type IconoId = "clientes" | "contratos" | "equipos" | "inventario" | "ventas" | "liquidacion";
+
+const ICONOS: Record<IconoId, string> = {
+  clientes: "M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6M9 10h.01M15 10h.01M9 14h.01M15 14h.01",
+  contratos: "M7 3h8l4 4v13a1 1 0 01-1 1H7a1 1 0 01-1-1V4a1 1 0 011-1zM9 9h6M9 13h6M9 17h4",
+  equipos: "M12 3s6 6.5 6 11a6 6 0 11-12 0c0-4.5 6-11 6-11z",
+  inventario: "M4 7l8-4 8 4-8 4-8-4zm0 0v10l8 4m0-14v14m8-14v10l-8 4",
+  ventas: "M4 8h16v11a1 1 0 01-1 1H5a1 1 0 01-1-1V8zm2 0V6a2 2 0 012-2h8a2 2 0 012 2v2",
+  liquidacion: "M12 3v18M6 7l-3 6a3 3 0 006 0l-3-6zm12 0l-3 6a3 3 0 006 0l-3-6zM3 7h6m6 0h6",
+};
+
+function Icono({ id, className }: { id: IconoId; className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={ICONOS[id]} />
+    </svg>
+  );
+}
+
+const ENLACES: { to: string; texto: string; icon: IconoId; roles: Rol[] }[] = [
+  { to: "/clientes", texto: "Clientes", icon: "clientes", roles: ["GERENCIA", "TECNICO"] },
+  { to: "/contratos", texto: "Contratos", icon: "contratos", roles: ["GERENCIA", "TECNICO"] },
+  { to: "/equipos", texto: "Equipos", icon: "equipos", roles: ["GERENCIA", "TECNICO"] },
+  { to: "/inventario", texto: "Inventario", icon: "inventario", roles: ["GERENCIA", "TECNICO"] },
+  { to: "/ventas", texto: "Ventas", icon: "ventas", roles: ["GERENCIA"] },
+  { to: "/liquidacion", texto: "Liquidación", icon: "liquidacion", roles: ["GERENCIA"] },
 ];
 
 export function Layout() {
@@ -52,7 +71,7 @@ export function Layout() {
                       : "flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-slate-300 hover:text-white hover:bg-white/10 transition-colors"
                   }
                 >
-                  <span className="text-xs">{l.icon}</span>
+                  <Icono id={l.icon} className="h-3.5 w-3.5" />
                   <span>{l.texto}</span>
                 </NavLink>
               ))}

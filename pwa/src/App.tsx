@@ -125,7 +125,9 @@ function EquipoPicker({ onElegido }: { onElegido: (equipo: EquipoConContrato) =>
               >
                 <div className="flex items-center gap-3">
                   <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl font-bold ${habilitado ? "bg-gradient-to-br from-blue-50 to-sky-100 text-blue-600 border border-blue-200/50" : "bg-slate-100 text-slate-400"}`}>
-                    💧
+                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3s6 6.5 6 11a6 6 0 11-12 0c0-4.5 6-11 6-11z" />
+                    </svg>
                   </div>
                   <div>
                     <span className="block font-bold text-slate-800 text-base group-hover:text-blue-600 transition-colors">{e.id}</span>
