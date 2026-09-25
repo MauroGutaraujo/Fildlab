@@ -1,45 +1,107 @@
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { Rol, useAuth } from "../auth/AuthContext";
 
-const ENLACES: { to: string; texto: string; roles: Rol[] }[] = [
-  { to: "/clientes", texto: "Clientes", roles: ["GERENCIA", "TECNICO"] },
-  { to: "/contratos", texto: "Contratos", roles: ["GERENCIA", "TECNICO"] },
-  { to: "/equipos", texto: "Equipos", roles: ["GERENCIA", "TECNICO"] },
-  { to: "/inventario", texto: "Inventario", roles: ["GERENCIA", "TECNICO"] },
-  { to: "/ventas", texto: "Ventas", roles: ["GERENCIA"] },
-  { to: "/liquidacion", texto: "Liquidación", roles: ["GERENCIA"] },
+const ENLACES: { to: string; texto: string; icon: string; roles: Rol[] }[] = [
+  { to: "/clientes", texto: "Clientes", icon: "🏢", roles: ["GERENCIA", "TECNICO"] },
+  { to: "/contratos", texto: "Contratos", icon: "📄", roles: ["GERENCIA", "TECNICO"] },
+  { to: "/equipos", texto: "Equipos", icon: "💧", roles: ["GERENCIA", "TECNICO"] },
+  { to: "/inventario", texto: "Inventario", icon: "📦", roles: ["GERENCIA", "TECNICO"] },
+  { to: "/ventas", texto: "Ventas", icon: "💼", roles: ["GERENCIA"] },
+  { to: "/liquidacion", texto: "Liquidación", icon: "⚖️", roles: ["GERENCIA"] },
 ];
 
 export function Layout() {
   const { user, logout } = useAuth();
+  const location = useLocation();
+
+  const seccionActual = ENLACES.find((e) => location.pathname.startsWith(e.to));
+
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="flex flex-wrap items-center justify-between gap-3 bg-gradient-to-r from-blue-700 via-blue-600 to-sky-500 px-4 py-2.5 text-white shadow-md">
-        <div className="flex items-center gap-6">
-          <div className="flex items-center gap-2.5">
-            <img src="/logo.png" alt="Fildlab" className="h-9 w-9 rounded-xl shadow-sm border border-white/20 object-contain bg-white/10" />
-            <span className="text-xl font-bold tracking-tight text-white drop-shadow-sm">Fildlab</span>
+    <div className="min-h-screen bg-slate-50/60 selection:bg-blue-100 selection:text-blue-900 flex flex-col justify-between">
+      <div>
+        <header className="sticky top-0 z-20 flex flex-wrap items-center justify-between gap-4 bg-gradient-to-r from-slate-900 via-blue-950 to-indigo-950 px-5 py-3 text-white shadow-md border-b border-white/10 backdrop-blur-md">
+          <div className="flex flex-wrap items-center gap-6">
+            <NavLink
+              to="/clientes"
+              className="flex items-center gap-2.5 hover:opacity-95 transition-opacity group cursor-pointer"
+              title="Ir al inicio de la plataforma"
+            >
+              <img
+                src="/logo.png"
+                alt="Fildlab"
+                className="h-9 w-9 rounded-xl shadow-xs border border-white/20 object-contain bg-white/10 group-hover:scale-105 transition-transform"
+              />
+              <div>
+                <span className="text-lg font-extrabold tracking-tight text-white drop-shadow-xs block leading-tight">
+                  Fildlab
+                </span>
+                <span className="text-[10px] font-semibold text-blue-300 tracking-wider uppercase block">
+                  Tratamiento de Agua
+                </span>
+              </div>
+            </NavLink>
+
+            <nav aria-label="Principal" className="flex flex-wrap items-center gap-1.5 text-xs font-medium">
+              {ENLACES.filter((l) => user && l.roles.includes(user.rol)).map((l) => (
+                <NavLink
+                  key={l.to}
+                  to={l.to}
+                  className={({ isActive }) =>
+                    isActive
+                      ? "flex items-center gap-1.5 rounded-xl bg-blue-600 px-3 py-1.5 font-bold text-white shadow-xs shadow-blue-500/30 transition-all scale-102"
+                      : "flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-slate-300 hover:text-white hover:bg-white/10 transition-colors"
+                  }
+                >
+                  <span className="text-xs">{l.icon}</span>
+                  <span>{l.texto}</span>
+                </NavLink>
+              ))}
+            </nav>
           </div>
-          <nav aria-label="Principal" className="flex flex-wrap gap-4 text-sm font-medium">
-            {ENLACES.filter((l) => user && l.roles.includes(user.rol)).map((l) => (
-              <NavLink key={l.to} to={l.to} className={({ isActive }) => (isActive ? "rounded-md bg-white/20 px-2.5 py-1 font-semibold text-white shadow-xs" : "rounded-md px-2.5 py-1 text-white/90 hover:bg-white/10 hover:text-white")}>
-                {l.texto}
+
+          <div className="flex items-center gap-3 text-xs">
+            <div className="flex items-center gap-2 rounded-xl bg-white/10 border border-white/15 px-3 py-1.5">
+              <div className="h-6 w-6 rounded-full bg-blue-500/30 flex items-center justify-center font-bold text-blue-200 uppercase text-[11px] border border-blue-400/30">
+                {user?.nombre?.charAt(0) || "U"}
+              </div>
+              <span className="font-semibold text-white/95">{user?.nombre}</span>
+              <span className="rounded-full bg-blue-500/20 border border-blue-400/30 px-2 py-0.5 text-[10px] font-bold tracking-wider text-blue-200">
+                {user?.rol}
+              </span>
+            </div>
+
+            <button
+              type="button"
+              onClick={logout}
+              className="rounded-xl border border-white/20 bg-white/5 hover:bg-red-500/20 hover:border-red-400/40 px-3 py-1.5 font-semibold text-white/80 hover:text-white transition-all cursor-pointer"
+            >
+              Salir
+            </button>
+          </div>
+        </header>
+
+        {/* Barra de migas de pan y contexto del módulo */}
+        <div className="bg-white border-b border-slate-200/80 px-6 py-2.5 shadow-2xs">
+          <div className="mx-auto max-w-6xl flex items-center justify-between text-xs text-slate-500 font-medium">
+            <div className="flex items-center gap-2">
+              <NavLink to="/clientes" className="hover:text-blue-600 transition-colors">
+                Plataforma
               </NavLink>
-            ))}
-          </nav>
+              <span>/</span>
+              <span className="text-slate-800 font-bold">{seccionActual?.texto || "Inicio"}</span>
+            </div>
+            <span className="text-[11px] text-slate-400">Fildlab Perú S.A.C. · Trujillo</span>
+          </div>
         </div>
-        <div className="flex items-center gap-3 text-sm">
-          <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-medium tracking-wide">
-            {user?.nombre} · {user?.rol}
-          </span>
-          <button type="button" onClick={logout} className="rounded-md border border-white/40 bg-white/10 px-3 py-1 text-xs font-semibold hover:bg-white/20 transition-colors">
-            Salir
-          </button>
-        </div>
-      </header>
-      <main className="mx-auto max-w-6xl p-4">
-        <Outlet />
-      </main>
+
+        <main className="mx-auto max-w-6xl p-5">
+          <Outlet />
+        </main>
+      </div>
+
+      <footer className="mt-12 border-t border-slate-200 bg-white py-4 px-6 text-center text-xs text-slate-400">
+        <p>Sistema de Gestión Integral de Tratamiento de Agua · Fildlab Perú S.A.C.</p>
+      </footer>
     </div>
   );
 }

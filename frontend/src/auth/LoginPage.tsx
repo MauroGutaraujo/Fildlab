@@ -30,6 +30,7 @@ export function LoginPage() {
       <div className="mb-6 flex flex-col items-center text-center">
         <img src="/logo.png" alt="Fildlab" className="mb-3 h-16 w-16 rounded-2xl shadow-md border border-slate-100 object-contain" />
         <h1 className="text-2xl font-bold tracking-tight text-slate-800">Fildlab</h1>
+        <h2 className="text-sm font-semibold text-blue-700">Ingreso a la Plataforma</h2>
         <p className="text-xs font-medium text-slate-500">Plataforma Administrativa de Tratamiento de Agua</p>
       </div>
       <form onSubmit={enviar} className="space-y-4">

@@ -5,7 +5,7 @@ import { CAMPOS_LECTURA_ORDEN, type CampoLectura, errorLectura } from "../../lib
 import { Firma } from "./Firma";
 import { useGps } from "./useGps";
 
-type Props = { contratoId: number; equipoSerie: string; tecnicoId: number; onCerrada?: () => void };
+type Props = { contratoId: number; equipoSerie: string; tecnicoId: number; onCerrada?: () => void; onVolver?: () => void };
 
 const ETIQUETAS: Record<CampoLectura, string> = {
   tds_entrada_ppm: "TDS entrada (ppm)",
@@ -22,7 +22,7 @@ type Lecturas = Record<CampoLectura, string>;
 const vacias = (): Lecturas =>
   Object.fromEntries(CAMPOS_LECTURA_ORDEN.map((c) => [c, ""])) as Lecturas;
 
-export function OrdenForm({ contratoId, equipoSerie, tecnicoId, onCerrada }: Props) {
+export function OrdenForm({ contratoId, equipoSerie, tecnicoId, onCerrada, onVolver }: Props) {
   const [lecturas, setLecturas] = useState<Lecturas>(vacias());
   const [tocado, setTocado] = useState<Partial<Record<CampoLectura, boolean>>>({});
   const [firma, setFirma] = useState<string | null>(null);
@@ -92,7 +92,22 @@ export function OrdenForm({ contratoId, equipoSerie, tecnicoId, onCerrada }: Pro
   }
 
   return (
-    <section className="p-4">
+    <section className="p-4 pb-24">
+      <div className="mb-4 flex items-center justify-between rounded-xl bg-blue-50 border border-blue-100 p-3">
+        <div>
+          <span className="text-xs font-semibold uppercase tracking-wider text-blue-600">Orden de Servicio</span>
+          <p className="text-sm font-bold text-slate-800">Equipo: {equipoSerie}</p>
+        </div>
+        {onVolver && (
+          <button
+            type="button"
+            onClick={onVolver}
+            className="flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50 transition-all cursor-pointer"
+          >
+            ← Volver a equipos
+          </button>
+        )}
+      </div>
       <h1 className="mb-4 text-lg font-semibold">Lecturas de agua</h1>
       <div className="grid gap-3 sm:grid-cols-2">
         {CAMPOS_LECTURA_ORDEN.map((campo) => (
@@ -183,14 +198,25 @@ export function OrdenForm({ contratoId, equipoSerie, tecnicoId, onCerrada }: Pro
               {errorGuardado}
             </p>
           )}
-          <button
-            type="button"
-            disabled={!puedeCerrar}
-            onClick={cerrarOrden}
-            className="rounded bg-emerald-700 px-4 py-2 text-white disabled:opacity-60"
-          >
-            Cerrar orden
-          </button>
+          <div className="flex flex-wrap items-center gap-3 pt-2">
+            <button
+              type="button"
+              disabled={!puedeCerrar}
+              onClick={cerrarOrden}
+              className="flex-1 rounded-xl bg-emerald-600 hover:bg-emerald-700 py-3 text-sm font-semibold text-white shadow-md transition-colors disabled:opacity-60 cursor-pointer"
+            >
+              Cerrar orden
+            </button>
+            {onVolver && (
+              <button
+                type="button"
+                onClick={onVolver}
+                className="rounded-xl border border-slate-300 bg-white hover:bg-slate-100 px-4 py-3 text-sm font-medium text-slate-700 transition-colors cursor-pointer"
+              >
+                Cancelar y volver
+              </button>
+            )}
+          </div>
         </div>
       )}
     </section>

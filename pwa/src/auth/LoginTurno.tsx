@@ -32,6 +32,7 @@ export function LoginTurno({ onIngreso }: { onIngreso: () => void }) {
       <div className="mb-6 flex flex-col items-center text-center">
         <img src="/logo.png" alt="Fildlab Campo" className="mb-3 h-20 w-20 rounded-3xl shadow-lg border border-slate-100 object-contain" />
         <h1 className="text-2xl font-bold tracking-tight text-slate-800">Fildlab Campo</h1>
+        <h2 className="text-sm font-semibold text-blue-700">Ingreso de Turno</h2>
         <p className="text-xs font-medium text-slate-500">PWA Offline · Turno Técnico de 12 Horas</p>
       </div>
       <form onSubmit={enviar} className="space-y-4">
@@ -67,9 +68,10 @@ export function LoginTurno({ onIngreso }: { onIngreso: () => void }) {
         <button
           type="submit"
           disabled={enviando}
+          aria-label="Ingresar turno"
           className="w-full rounded-xl bg-gradient-to-r from-blue-600 via-blue-600 to-sky-500 py-3 text-sm font-semibold text-white shadow-md hover:from-blue-700 hover:to-sky-600 transition-all active:scale-[0.99] disabled:opacity-60 cursor-pointer"
         >
-          {enviando ? "Iniciando Turno…" : "Iniciar Turno de Campo"}
+          {enviando ? "Iniciando Turno…" : "Ingresar / Iniciar Turno"}
         </button>
       </form>
     </main>
