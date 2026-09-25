@@ -220,7 +220,7 @@ CREATE TABLE predicciones_rul (
 
 ## 7. CHECKLIST DE IMPLEMENTACIÓN BASADO EN LA EDT
 
-- [ ] **Fase 3: Núcleo Transaccional**
+- [x] **Fase 3: Núcleo Transaccional**
   - [x] 3.1 Plataforma Web Central
     - [x] 3.1.1 Módulo de clientes (Validación RUC de 11 dígitos)
     - [x] 3.1.2 Módulo de contratos y configuración SLA
@@ -235,10 +235,10 @@ CREATE TABLE predicciones_rul (
     - [x] 3.2.3 Servicio de sincronización Outbox con TanStack Query
     - [x] 3.2.4 Inventario móvil en dispositivo (Descuento local inmediato)
     - [x] 3.2.5 Módulo de firma digital en canvas (DPR=2) y geolocalización
-  - [ ] 3.3 Despliegue del Sistema (Free Tier)
+  - [x] 3.3 Despliegue del Sistema (Free Tier)
     - [x] 3.3.1 Configuración de Neon PostgreSQL
-    - [x] 3.3.2 Publicar API en Render con Dockerfile optimizado
-    - [ ] 3.3.3 Publicar PWA en Cloudflare Pages
+    - [x] 3.3.2 Publicar API en Render con Dockerfile optimizado (`https://fildlab-api.onrender.com`)
+    - [x] 3.3.3 Publicar PWA y Web en Cloudflare Pages (`https://fildlab.pages.dev` y `https://fildlab-pwa.pages.dev`)
 
 - [ ] **Fase 4: Integración Analítica y Pruebas**
   - [ ] 4.1 Módulo de Business Intelligence (Apache ECharts)

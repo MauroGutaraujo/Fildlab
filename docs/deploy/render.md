@@ -43,7 +43,8 @@ $env:GERENTE_PASSWORD = "..."
 
 (Si tu plan de Render sí incluye acceso a **Shell** para el servicio, correr el mismo comando `python -m app.scripts.crear_gerente` ahí es una alternativa equivalente, con las variables ya cargadas desde el Environment del servicio.)
 
-## 5. Verificación post-deploy
-- `curl https://<tu-servicio>.onrender.com/api/v1/healthz` → `{"status":"ok"}`.
-- `curl -X POST https://<tu-servicio>.onrender.com/api/v1/auth/login -H "Content-Type: application/json" -d "{\"email\":\"...\",\"password\":\"...\"}"` con el usuario Gerencia recién creado → debe devolver un `access_token`.
-- `VITE_API_URL` en los dos proyectos de Cloudflare Pages (ver `docs/deploy/cloudflare-pages.md`) debe apuntar a esta URL de Render, no a la de Koyeb.
+## 5. Verificación post-deploy (Servicio en producción: `https://fildlab-api.onrender.com`)
+- `curl https://fildlab-api.onrender.com/api/v1/healthz` → `{"status":"ok"}`.
+- `curl -X POST https://fildlab-api.onrender.com/api/v1/auth/login -H "Content-Type: application/json" -d "{\"email\":\"...\",\"password\":\"...\"}"` con el usuario Gerencia recién creado → debe devolver un `access_token`.
+- Documentación Swagger/OpenAPI interactiva: `https://fildlab-api.onrender.com/docs`.
+- `VITE_API_URL` en los dos proyectos de Cloudflare Pages (ver `docs/deploy/cloudflare-pages.md`) apunta a `https://fildlab-api.onrender.com`.

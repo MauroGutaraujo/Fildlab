@@ -13,8 +13,13 @@ Mismos pasos, con:
 - **Root directory**: `pwa`.
 - Mismo `VITE_API_URL`.
 
-## Verificación post-deploy (ambos proyectos)
-- La URL `*.pages.dev` asignada carga la pantalla de login.
-- Navegar a una ruta que no exista en el historial del navegador (pegar la URL de una pantalla interna directamente) y recargar: debe seguir mostrando la app, no un 404 de Cloudflare — confirma que `_redirects` se aplicó.
-- Solo para el proyecto de la PWA: en un navegador móvil (o Chrome DevTools → Application → Manifest), confirmar que aparece la opción "Agregar a pantalla de inicio" / "Instalar" — confirma que `manifest.webmanifest` y `sw.js` se sirvieron correctamente.
-- Iniciar sesión contra el backend real de Render desde ambas URLs de Cloudflare Pages — confirma que CORS (Tarea 0) permite el origen `*.pages.dev` real, no solo el patrón en el test.
+## Verificación post-deploy (Servicios en producción)
+- **Panel Administrativo (Frontend Web):** `https://fildlab.pages.dev`
+- **PWA de Campo para Técnicos:** `https://fildlab-pwa.pages.dev`
+- **Backend API:** `https://fildlab-api.onrender.com` (Healthcheck: `/api/v1/healthz`, Swagger: `/docs`)
+
+### Pruebas de funcionamiento:
+- Ambas URLs cargan la pantalla de inicio y autenticación con certificados SSL/TLS 1.3 de Cloudflare.
+- Navegar a una ruta interna directamente y recargar mantiene la app sin error 404 (reglas `_redirects` operativas).
+- En navegadores móviles sobre la PWA (`https://fildlab-pwa.pages.dev`), aparece el aviso nativo "Instalar aplicación" (manifest e iconos oficiales validados).
+- Conectividad API y CORS validados contra `https://fildlab-api.onrender.com`.

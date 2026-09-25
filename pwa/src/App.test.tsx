@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { App } from "./App";
 import { db } from "./db/dexie";
@@ -107,6 +107,31 @@ describe("App (PWA)", () => {
     expect(pushSpy).not.toHaveBeenCalled();
 
     goSpy.mockRestore();
+    pushSpy.mockRestore();
+  });
+
+  it("resguarda el historial nativo al montar y lo vuelve a armar al llegar a la raíz, para que el botón Atrás nunca cierre la app (solo «Salir» debe hacerlo)", async () => {
+    await db.sesion.put({ id: "actual", token: "tok-ya-logueado", guardado_en: "2026-01-01" });
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify([]), { status: 200 }));
+    const pushSpy = vi.spyOn(window.history, "pushState");
+
+    render(<App />);
+    await screen.findByRole("heading", { name: /elegir equipo/i });
+
+    // Al montar, ya debe existir una entrada de resguardo aunque el usuario no haya navegado aún
+    expect(pushSpy).toHaveBeenCalled();
+    pushSpy.mockClear();
+
+    // Simula el botón Atrás nativo mientras seguimos en la pantalla raíz (equipo): no hay nada
+    // que desapilar dentro de la app, así que debe re-armar el resguardo en vez de dejar que
+    // Android agote el historial y cierre la app
+    act(() => {
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    });
+
+    expect(pushSpy).toHaveBeenCalled();
+    expect(await screen.findByRole("heading", { name: /elegir equipo/i })).toBeInTheDocument();
+
     pushSpy.mockRestore();
   });
 });

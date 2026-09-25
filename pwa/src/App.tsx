@@ -33,6 +33,42 @@ function BotonSincronizar() {
   );
 }
 
+function useConectividad() {
+  const [enLinea, setEnLinea] = useState(() => navigator.onLine);
+  useEffect(() => {
+    const marcarOnline = () => setEnLinea(true);
+    const marcarOffline = () => setEnLinea(false);
+    window.addEventListener("online", marcarOnline);
+    window.addEventListener("offline", marcarOffline);
+    return () => {
+      window.removeEventListener("online", marcarOnline);
+      window.removeEventListener("offline", marcarOffline);
+    };
+  }, []);
+  return enLinea;
+}
+
+function BadgeConectividad() {
+  const enLinea = useConectividad();
+  return (
+    <span
+      role="status"
+      aria-label={enLinea ? "En línea" : "Sin conexión"}
+      className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold border ${
+        enLinea
+          ? "bg-emerald-500/15 text-emerald-200 border-emerald-400/30"
+          : "bg-amber-500/15 text-amber-200 border-amber-400/30"
+      }`}
+    >
+      <span className="relative flex h-2 w-2">
+        {enLinea && <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 animate-ping" />}
+        <span className={`relative inline-flex h-2 w-2 rounded-full ${enLinea ? "bg-emerald-400" : "bg-amber-400"}`} />
+      </span>
+      {enLinea ? "En línea" : "Offline"}
+    </span>
+  );
+}
+
 type EquipoDatos = { serie: string; contrato_id: number | null };
 type EquipoConContrato = { serie: string; contrato_id: number };
 
@@ -144,6 +180,16 @@ function AppInterna() {
       .finally(() => setCargando(false));
   }, []);
 
+  // Al abrir la app (sobre todo instalada como PWA), la pantalla raíz "equipo" queda parada
+  // justo sobre la ÚNICA entrada de historial nativo que existe (la del lanzamiento). Sin una
+  // entrada de resguardo, el primer "Atrás" real agota ese historial y Android cierra la app
+  // en vez de dejarle a React manejar la navegación. Empujamos un resguardo apenas montamos.
+  useEffect(() => {
+    try {
+      window.history.pushState({ raiz: true }, "");
+    } catch {}
+  }, []);
+
   // Soporte bidireccional y múltiple con el botón Atrás de Android / Navegador
   useEffect(() => {
     const manejarPopState = () => {
@@ -157,11 +203,20 @@ function AppInterna() {
         }
         return [{ pantalla: "equipo", equipo: null }];
       });
+
+      // Ya estábamos en la raíz: no hay nada más que desapilar dentro de la app.
+      // Volvemos a empujar el resguardo para que Android nunca agote el historial
+      // nativo y termine cerrando la app; solo "Salir" debe cerrar la sesión.
+      if (pila.length <= 1) {
+        try {
+          window.history.pushState({ raiz: true }, "");
+        } catch {}
+      }
     };
 
     window.addEventListener("popstate", manejarPopState);
     return () => window.removeEventListener("popstate", manejarPopState);
-  }, []);
+  }, [pila.length]);
 
   const actual = pila[pila.length - 1] || { pantalla: "equipo", equipo: null };
   const pantalla = actual.pantalla;
@@ -225,7 +280,7 @@ function AppInterna() {
   return (
     <div className="min-h-screen bg-slate-50/70 flex flex-col justify-between antialiased selection:bg-blue-100 selection:text-blue-900">
       {/* Cabecera persistente de alta fidelidad con gradiente e iluminación */}
-      <header className="sticky top-0 z-20 flex flex-wrap items-center justify-between gap-2 bg-gradient-to-r from-blue-700 via-indigo-600 to-sky-600 px-4 py-3 text-white shadow-md shadow-blue-900/10 border-b border-white/10 backdrop-blur-md">
+      <header className="sticky top-0 z-20 flex flex-wrap items-center justify-between gap-2 bg-gradient-to-r from-sky-900 to-indigo-950 px-4 py-3 text-white shadow-md shadow-indigo-950/20 border-b border-white/10 backdrop-blur-md">
         <div className="flex items-center gap-2.5">
           {pantalla !== "equipo" ? (
             <button
@@ -265,6 +320,7 @@ function AppInterna() {
         </div>
 
         <nav className="flex items-center gap-2 text-xs font-medium">
+          <BadgeConectividad />
           <BotonSincronizar />
           <button
             type="button"
