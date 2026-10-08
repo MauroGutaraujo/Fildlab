@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError
 
-from app.api.v1 import auth, clientes, contratos, equipos, health, inventario, liquidacion, ventas
+from app.api.v1 import analytics, auth, clientes, contratos, equipos, health, inventario, liquidacion, ventas
 
 app = FastAPI(title="Fildlab API", version="0.1.0")
 
@@ -17,6 +17,7 @@ app.add_middleware(
 )
 
 app.include_router(health.router, prefix="/api/v1")
+app.include_router(analytics.router, prefix="/api/v1")
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(clientes.router, prefix="/api/v1")
 app.include_router(contratos.router, prefix="/api/v1")
