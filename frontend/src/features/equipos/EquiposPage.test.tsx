@@ -61,7 +61,22 @@ describe("EquiposPage", () => {
     renderWithProviders(<EquiposPage />, { rol: "TECNICO" });
     expect(await screen.findByText("RO-2026-0001")).toBeInTheDocument();
     expect(screen.getByText("Ósmosis inversa")).toBeInTheDocument();
-    expect(screen.getByText(/tds_entrada_ppm/)).toBeInTheDocument();
+    expect(screen.queryByText(/tds_entrada_ppm/)).not.toBeInTheDocument();
+  });
+
+  it("el detalle de parámetros nominales se ve en un modal, con etiquetas legibles", async () => {
+    mockApi([{ path: "/api/v1/equipos", body: [EQUIPO] }, SIN_PREDICCIONES]);
+    renderWithProviders(<EquiposPage />, { rol: "TECNICO" });
+    await screen.findByText("RO-2026-0001");
+    expect(screen.queryByText("TDS entrada (ppm)")).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /ver detalle/i }));
+    expect(await screen.findByText("TDS entrada (ppm)")).toBeInTheDocument();
+    expect(screen.getByText("350")).toBeInTheDocument();
+    expect(screen.getByText("7")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /cerrar/i }));
+    expect(screen.queryByText("TDS entrada (ppm)")).not.toBeInTheDocument();
   });
 
   it("TECNICO no ve acciones de escritura", async () => {

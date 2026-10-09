@@ -47,6 +47,41 @@ function BadgeAlerta({ prediccion }: { prediccion: PrediccionRul | undefined }) 
   );
 }
 
+function ModalParametros({ equipo, onCerrar }: { equipo: Equipo; onCerrar: () => void }) {
+  const valores = equipo.parametros_nominales;
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4"
+      onClick={onCerrar}
+    >
+      <div
+        className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-base font-bold text-slate-800">Parámetros nominales — {equipo.serie}</h2>
+          <button
+            type="button"
+            onClick={onCerrar}
+            aria-label="Cerrar"
+            className="text-slate-400 hover:text-slate-700 cursor-pointer"
+          >
+            Cerrar
+          </button>
+        </div>
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+          {PARAMETROS.map((p) => (
+            <div key={p.clave}>
+              <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">{p.label}</dt>
+              <dd className="text-slate-800">{String(valores[p.campo] ?? "—")}</dd>
+            </div>
+          ))}
+        </dl>
+      </div>
+    </div>
+  );
+}
+
 const CLAVES_PARAMETROS = [
   "tdsEntrada",
   "tdsPostMembrana",
@@ -86,6 +121,7 @@ export function EquiposPage() {
   });
   const prediccionPorSerie = new Map((predicciones.data ?? []).map((p) => [p.equipo_serie, p]));
   const enRiesgo = (predicciones.data ?? []).filter((p) => p.nivel_alerta === "ROJO");
+  const [detalleEquipo, setDetalleEquipo] = useState<Equipo | null>(null);
 
   const [abierto, setAbierto] = useState(false);
   const [serie, setSerie] = useState("");
@@ -220,10 +256,23 @@ export function EquiposPage() {
           { header: "Tipo", cell: (e) => TIPOS[e.tipo_sistema] ?? e.tipo_sistema },
           { header: "Cliente (RUC)", cell: (e) => e.cliente_ruc },
           { header: "Instalación", cell: (e) => e.fecha_instalacion },
-          { header: "Parámetros nominales", cell: (e) => <code className="text-xs">{JSON.stringify(e.parametros_nominales)}</code> },
+          {
+            header: "Parámetros nominales",
+            cell: (e) => (
+              <button
+                type="button"
+                onClick={() => setDetalleEquipo(e)}
+                className="text-xs font-semibold text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+              >
+                Ver detalle
+              </button>
+            ),
+          },
           { header: "RUL", cell: (e) => <BadgeAlerta prediccion={prediccionPorSerie.get(e.serie)} /> },
         ]}
       />
+
+      {detalleEquipo && <ModalParametros equipo={detalleEquipo} onCerrar={() => setDetalleEquipo(null)} />}
     </section>
   );
 }
