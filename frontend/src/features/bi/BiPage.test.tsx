@@ -1,19 +1,34 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { BiPage } from "./BiPage";
+import { BiPage, periodoActual } from "./BiPage";
 import { mockApi, renderWithProviders } from "../../test/utils";
 
 vi.mock("echarts-for-react/lib/core", () => ({
   default: (props: { option: unknown }) => <div data-testid="chart-mock">{JSON.stringify(props.option)}</div>,
 }));
 
+function periodoLimaDe(fecha: Date): string {
+  const partes = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Lima", year: "numeric", month: "2-digit" }).formatToParts(fecha);
+  return `${partes.find((p) => p.type === "year")!.value}-${partes.find((p) => p.type === "month")!.value}`;
+}
+
 describe("BiPage", () => {
-  it("el selector de periodo arranca en el mes actual", async () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("el selector de periodo arranca en el mes actual (calendario de Lima)", async () => {
     renderWithProviders(<BiPage />);
     const input = screen.getByLabelText("Periodo") as HTMLInputElement;
-    const esperado = new Date().toISOString().slice(0, 7);
-    expect(input.value).toBe(esperado);
+    expect(input.value).toBe(periodoLimaDe(new Date()));
+  });
+
+  it("periodoActual usa el calendario de Lima (America/Lima), no UTC", () => {
+    vi.useFakeTimers();
+    // 2026-10-01 04:30 UTC = 2026-09-30 23:30 en Lima (UTC-5): un corte en UTC diria octubre; en Lima sigue siendo septiembre.
+    vi.setSystemTime(new Date(Date.UTC(2026, 9, 1, 4, 30)));
+    expect(periodoActual()).toBe("2026-09");
   });
 
   it("TECNICO no ve el enlace BI en el navbar", async () => {

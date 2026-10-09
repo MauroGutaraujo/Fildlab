@@ -35,13 +35,13 @@ async def _orden(db, contrato, crear_usuario, *, estado="LIQUIDADA", fecha, tiem
     return o
 
 
-async def _consumo(db, orden, usuario_id, *, repuesto_codigo="FILT-05", cantidad=2, costo_unitario="5.00"):
+async def _consumo(db, orden, usuario_id, *, repuesto_codigo="FILT-05", cantidad=2, costo_unitario="5.00", tipo="SALIDA_ORDEN"):
     rep = await db.get(Repuesto, repuesto_codigo)
     if rep is None:
         rep = Repuesto(codigo=repuesto_codigo, descripcion=repuesto_codigo, costo_unitario_soles=Decimal(costo_unitario))
         db.add(rep)
         await db.flush()
-    db.add(MovimientoInventario(repuesto_codigo=repuesto_codigo, tipo="SALIDA_ORDEN", cantidad=cantidad,
+    db.add(MovimientoInventario(repuesto_codigo=repuesto_codigo, tipo=tipo, cantidad=cantidad,
                                 orden_id=orden.id, usuario_id=usuario_id))
     await db.flush()
 
@@ -115,6 +115,65 @@ async def test_rentabilidad_contrato_fuera_de_rango_del_mes_no_aparece(client, g
 
     r = await client.get("/api/v1/analytics/rentabilidad?periodo=2026-09", headers=gerente_h)
     assert r.json()["contratos"] == []
+
+
+async def test_rentabilidad_contrato_anulado_no_aparece(client, gerente_h, db, crear_cliente):
+    contrato = await _contrato(db, crear_cliente)
+    contrato.estado = "ANULADO"
+    await db.commit()
+
+    r = await client.get("/api/v1/analytics/rentabilidad?periodo=2026-09", headers=gerente_h)
+    assert r.json()["contratos"] == []
+
+
+async def test_rentabilidad_corta_el_mes_en_hora_de_lima_no_utc(client, gerente_h, db, crear_cliente, crear_usuario):
+    """2026-10-01 04:30 UTC es 2026-09-30 23:30 en Lima (UTC-5): debe seguir contando como septiembre."""
+    contrato = await _contrato(db, crear_cliente)
+    orden = await _orden(db, contrato, crear_usuario, estado="LIQUIDADA",
+                         fecha=datetime(2026, 10, 1, 4, 30, tzinfo=timezone.utc))
+    await _consumo(db, orden, orden.tecnico_id, cantidad=1, costo_unitario="5.00")
+    await db.commit()
+
+    r = await client.get("/api/v1/analytics/rentabilidad?periodo=2026-09", headers=gerente_h)
+    assert r.json()["contratos"][0]["costo_repuestos_soles"] == "5.00"
+
+    r = await client.get("/api/v1/analytics/rentabilidad?periodo=2026-10", headers=gerente_h)
+    assert r.json()["contratos"][0]["costo_repuestos_soles"] in ("0.00", "0")
+
+
+async def test_sla_corta_el_mes_en_hora_de_lima_no_utc(client, gerente_h, db, crear_cliente, crear_usuario):
+    contrato = await _contrato(db, crear_cliente)
+    await _orden(db, contrato, crear_usuario, fecha=datetime(2026, 10, 1, 4, 30, tzinfo=timezone.utc))
+    await db.commit()
+
+    assert (await client.get("/api/v1/analytics/sla?periodo=2026-09", headers=gerente_h)).json()["total_ordenes"] == 1
+    assert (await client.get("/api/v1/analytics/sla?periodo=2026-10", headers=gerente_h)).json()["total_ordenes"] == 0
+
+
+async def test_rentabilidad_ajuste_salida_de_adenda_suma_costo(client, gerente_h, db, crear_cliente, crear_usuario):
+    """RN-04: una adenda que descubre consumo adicional genera AJUSTE_SALIDA — debe sumar al costo real."""
+    contrato = await _contrato(db, crear_cliente)
+    orden = await _orden(db, contrato, crear_usuario, estado="LIQUIDADA",
+                         fecha=datetime(2026, 9, 15, tzinfo=timezone.utc))
+    await _consumo(db, orden, orden.tecnico_id, cantidad=2, costo_unitario="5.00", tipo="SALIDA_ORDEN")  # 10.00
+    await _consumo(db, orden, orden.tecnico_id, cantidad=1, costo_unitario="5.00", tipo="AJUSTE_SALIDA")  # +5.00
+    await db.commit()
+
+    r = await client.get("/api/v1/analytics/rentabilidad?periodo=2026-09", headers=gerente_h)
+    assert r.json()["contratos"][0]["costo_repuestos_soles"] == "15.00"
+
+
+async def test_rentabilidad_ajuste_entrada_de_adenda_resta_costo(client, gerente_h, db, crear_cliente, crear_usuario):
+    """RN-04: una adenda que devuelve stock genera AJUSTE_ENTRADA — debe restar del costo real."""
+    contrato = await _contrato(db, crear_cliente)
+    orden = await _orden(db, contrato, crear_usuario, estado="LIQUIDADA",
+                         fecha=datetime(2026, 9, 15, tzinfo=timezone.utc))
+    await _consumo(db, orden, orden.tecnico_id, cantidad=3, costo_unitario="5.00", tipo="SALIDA_ORDEN")  # 15.00
+    await _consumo(db, orden, orden.tecnico_id, cantidad=1, costo_unitario="5.00", tipo="AJUSTE_ENTRADA")  # -5.00
+    await db.commit()
+
+    r = await client.get("/api/v1/analytics/rentabilidad?periodo=2026-09", headers=gerente_h)
+    assert r.json()["contratos"][0]["costo_repuestos_soles"] == "10.00"
 
 
 async def test_rentabilidad_dos_contratos_no_mezclan_costos(client, gerente_h, db, crear_cliente, crear_usuario):

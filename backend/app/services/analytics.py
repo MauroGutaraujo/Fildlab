@@ -1,5 +1,6 @@
-from datetime import datetime, timezone
+from datetime import datetime
 from decimal import Decimal
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,13 +10,17 @@ from app.models.contrato import Contrato
 from app.models.orden import OrdenServicio
 from app.models.repuesto import MovimientoInventario, Repuesto
 
+LIMA = ZoneInfo("America/Lima")
+
 
 def _rango_mes(periodo: str) -> tuple[datetime, datetime]:
-    """periodo ya viene validado como YYYY-MM por el schema Periodo. Devuelve [inicio, fin) en UTC."""
+    """periodo ya viene validado como YYYY-MM por el schema Periodo. "Mes calendario" es el mes del negocio
+    (Trujillo, Peru, UTC-5) — no UTC. Convertimos el limite de mes en hora de Lima al instante UTC
+    equivalente, para comparar contra fecha_creacion_cliente (timestamptz) por instante absoluto."""
     anio, mes = (int(x) for x in periodo.split("-"))
-    inicio = datetime(anio, mes, 1, tzinfo=timezone.utc)
-    fin = datetime(anio + 1, 1, 1, tzinfo=timezone.utc) if mes == 12 else datetime(anio, mes + 1, 1, tzinfo=timezone.utc)
-    return inicio, fin
+    inicio_lima = datetime(anio, mes, 1, tzinfo=LIMA)
+    fin_lima = datetime(anio + 1, 1, 1, tzinfo=LIMA) if mes == 12 else datetime(anio, mes + 1, 1, tzinfo=LIMA)
+    return inicio_lima, fin_lima
 
 
 async def rentabilidad_por_contrato(session: AsyncSession, periodo: str) -> list[dict]:
@@ -25,7 +30,11 @@ async def rentabilidad_por_contrato(session: AsyncSession, periodo: str) -> list
         await session.execute(
             select(Contrato, Cliente.razon_social)
             .join(Cliente, Cliente.ruc == Contrato.cliente_ruc)
-            .where(Contrato.fecha_inicio < fin.date(), Contrato.fecha_fin >= inicio.date())
+            .where(
+                Contrato.fecha_inicio < fin.date(),
+                Contrato.fecha_fin >= inicio.date(),
+                Contrato.estado != "ANULADO",
+            )
             .order_by(Contrato.id)
         )
     ).all()

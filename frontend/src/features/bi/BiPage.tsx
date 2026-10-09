@@ -2,8 +2,18 @@ import { useState } from "react";
 import { TableroRentabilidad } from "./TableroRentabilidad";
 import { TableroSla } from "./TableroSla";
 
-function periodoActual(): string {
-  return new Date().toISOString().slice(0, 7);
+// "Mes calendario" es el mes del negocio (Trujillo, Peru, UTC-5) — no UTC. Usamos Intl con
+// timeZone explicito en vez de los componentes locales del navegador, para que el resultado
+// no dependa de en que huso horario este configurado el dispositivo que abre la pagina.
+export function periodoActual(): string {
+  const partes = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Lima",
+    year: "numeric",
+    month: "2-digit",
+  }).formatToParts(new Date());
+  const anio = partes.find((p) => p.type === "year")!.value;
+  const mes = partes.find((p) => p.type === "month")!.value;
+  return `${anio}-${mes}`;
 }
 
 export function BiPage() {
