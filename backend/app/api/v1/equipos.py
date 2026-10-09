@@ -7,7 +7,9 @@ from app.core.deps import get_current_user, require_role
 from app.models.cliente import Cliente
 from app.models.contrato import Contrato
 from app.models.equipo import Equipo
+from app.models.prediccion_rul import PrediccionRul
 from app.schemas.equipo import EquipoIn, EquipoOut, EquipoUpdate
+from app.schemas.prediccion_rul import PrediccionRulOut
 
 router = APIRouter(prefix="/equipos", tags=["equipos"], dependencies=[Depends(get_current_user)])
 solo_gerencia = Depends(require_role("GERENCIA"))
@@ -28,6 +30,20 @@ async def _obtener(session: AsyncSession, serie: str) -> Equipo:
     if equipo is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Equipo no encontrado")
     return equipo
+
+
+@router.get("/predicciones-rul", response_model=list[PrediccionRulOut])
+async def listar_predicciones_rul(session: AsyncSession = Depends(get_session)):
+    return (await session.execute(select(PrediccionRul))).scalars().all()
+
+
+@router.get("/{serie}/prediccion-rul", response_model=PrediccionRulOut)
+async def leer_prediccion_rul(serie: str, session: AsyncSession = Depends(get_session)):
+    await _obtener(session, serie)
+    prediccion = await session.get(PrediccionRul, serie)
+    if prediccion is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Aún no hay predicción RUL para este equipo")
+    return prediccion
 
 
 @router.get("", response_model=list[EquipoOut])
