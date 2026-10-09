@@ -23,6 +23,30 @@ type Equipo = {
   parametros_nominales: Record<string, unknown>;
 };
 
+type NivelAlerta = "VERDE" | "AMARILLO" | "ROJO";
+type PrediccionRul = { equipo_serie: string; dias_vida_util_remanente: number; nivel_alerta: NivelAlerta };
+
+const COLORES_ALERTA: Record<NivelAlerta, string> = {
+  VERDE: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  AMARILLO: "bg-amber-50 text-amber-700 border-amber-200",
+  ROJO: "bg-red-50 text-red-700 border-red-200",
+};
+
+function BadgeAlerta({ prediccion }: { prediccion: PrediccionRul | undefined }) {
+  if (!prediccion) {
+    return (
+      <span className="inline-block rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-medium text-slate-500">
+        Sin evaluar
+      </span>
+    );
+  }
+  return (
+    <span className={`inline-block rounded-full border px-2 py-0.5 text-xs font-semibold ${COLORES_ALERTA[prediccion.nivel_alerta]}`}>
+      {prediccion.nivel_alerta} · {prediccion.dias_vida_util_remanente} días
+    </span>
+  );
+}
+
 const CLAVES_PARAMETROS = [
   "tdsEntrada",
   "tdsPostMembrana",
@@ -56,6 +80,12 @@ export function EquiposPage() {
   const puedeEscribir = useAuth().user?.rol === "GERENCIA";
   const qc = useQueryClient();
   const { data = [], isLoading, error } = useQuery({ queryKey: ["equipos"], queryFn: () => apiFetch<Equipo[]>("/equipos") });
+  const predicciones = useQuery({
+    queryKey: ["equipos", "predicciones-rul"],
+    queryFn: () => apiFetch<PrediccionRul[]>("/equipos/predicciones-rul"),
+  });
+  const prediccionPorSerie = new Map((predicciones.data ?? []).map((p) => [p.equipo_serie, p]));
+  const enRiesgo = (predicciones.data ?? []).filter((p) => p.nivel_alerta === "ROJO");
 
   const [abierto, setAbierto] = useState(false);
   const [serie, setSerie] = useState("");
@@ -163,6 +193,17 @@ export function EquiposPage() {
         </FormPanel>
       )}
 
+      {enRiesgo.length > 0 && (
+        <div className="mb-4 rounded-2xl border border-red-200 bg-red-50/60 p-4">
+          <h2 className="text-sm font-bold text-red-800 mb-1">Equipos en riesgo crítico de falla</h2>
+          <ul className="text-sm text-red-700 list-disc list-inside">
+            {enRiesgo.map((p) => (
+              <li key={p.equipo_serie}>{p.equipo_serie} — {p.dias_vida_util_remanente} días restantes</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       <DataTable
         rows={data}
         rowKey={(e) => e.serie}
@@ -174,6 +215,7 @@ export function EquiposPage() {
           { header: "Cliente (RUC)", cell: (e) => e.cliente_ruc },
           { header: "Instalación", cell: (e) => e.fecha_instalacion },
           { header: "Parámetros nominales", cell: (e) => <code className="text-xs">{JSON.stringify(e.parametros_nominales)}</code> },
+          { header: "RUL", cell: (e) => <BadgeAlerta prediccion={prediccionPorSerie.get(e.serie)} /> },
         ]}
       />
     </section>

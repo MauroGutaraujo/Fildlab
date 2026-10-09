@@ -26,6 +26,8 @@ const EQUIPO = {
   parametros_nominales: PARAMS_REQ03,
 };
 
+const SIN_PREDICCIONES = { path: "/api/v1/equipos/predicciones-rul", body: [] };
+
 const posts = (f: ReturnType<typeof mockApi>) =>
   f.mock.calls.filter(([, i]) => (i as RequestInit | undefined)?.method === "POST");
 
@@ -55,7 +57,7 @@ async function llenar(
 
 describe("EquiposPage", () => {
   it("lista equipos con su tipo legible y parámetros", async () => {
-    mockApi([{ path: "/api/v1/equipos", body: [EQUIPO] }]);
+    mockApi([{ path: "/api/v1/equipos", body: [EQUIPO] }, SIN_PREDICCIONES]);
     renderWithProviders(<EquiposPage />, { rol: "TECNICO" });
     expect(await screen.findByText("RO-2026-0001")).toBeInTheDocument();
     expect(screen.getByText("Ósmosis inversa")).toBeInTheDocument();
@@ -63,7 +65,7 @@ describe("EquiposPage", () => {
   });
 
   it("TECNICO no ve acciones de escritura", async () => {
-    mockApi([{ path: "/api/v1/equipos", body: [EQUIPO] }]);
+    mockApi([{ path: "/api/v1/equipos", body: [EQUIPO] }, SIN_PREDICCIONES]);
     renderWithProviders(<EquiposPage />, { rol: "TECNICO" });
     await screen.findByText("RO-2026-0001");
     expect(screen.queryByRole("button", { name: /nuevo equipo/i })).not.toBeInTheDocument();
@@ -71,13 +73,13 @@ describe("EquiposPage", () => {
   });
 
   it("lista vacía muestra «Sin datos disponibles»", async () => {
-    mockApi([{ path: "/api/v1/equipos", body: [] }]);
+    mockApi([{ path: "/api/v1/equipos", body: [] }, SIN_PREDICCIONES]);
     renderWithProviders(<EquiposPage />);
     expect(await screen.findByText("Sin datos disponibles")).toBeInTheDocument();
   });
 
   it("ofrece los tres tipos de sistema", async () => {
-    mockApi([{ path: "/api/v1/equipos", body: [] }]);
+    mockApi([{ path: "/api/v1/equipos", body: [] }, SIN_PREDICCIONES]);
     renderWithProviders(<EquiposPage />);
     await userEvent.click(await screen.findByRole("button", { name: /nuevo equipo/i }));
     const opciones = Array.from((screen.getByLabelText("Tipo de sistema") as HTMLSelectElement).options).map((o) => o.value);
@@ -87,6 +89,7 @@ describe("EquiposPage", () => {
   it("crea un equipo con el body que espera la API", async () => {
     const f = mockApi([
       { path: "/api/v1/equipos", body: [] },
+      SIN_PREDICCIONES,
       { method: "POST", path: "/api/v1/equipos", status: 201, body: EQUIPO },
     ]);
     renderWithProviders(<EquiposPage />);
@@ -104,7 +107,7 @@ describe("EquiposPage", () => {
   });
 
   it("parámetros nominales: un campo vacío se rechaza", async () => {
-    const f = mockApi([{ path: "/api/v1/equipos", body: [] }]);
+    const f = mockApi([{ path: "/api/v1/equipos", body: [] }, SIN_PREDICCIONES]);
     renderWithProviders(<EquiposPage />);
     await userEvent.click(await screen.findByRole("button", { name: /nuevo equipo/i }));
     await llenar();
@@ -115,7 +118,7 @@ describe("EquiposPage", () => {
   });
 
   it("parámetros nominales: un texto no numérico se rechaza", async () => {
-    const f = mockApi([{ path: "/api/v1/equipos", body: [] }]);
+    const f = mockApi([{ path: "/api/v1/equipos", body: [] }, SIN_PREDICCIONES]);
     renderWithProviders(<EquiposPage />);
     await userEvent.click(await screen.findByRole("button", { name: /nuevo equipo/i }));
     await llenar();
@@ -126,7 +129,7 @@ describe("EquiposPage", () => {
   });
 
   it("parámetros nominales: pH fuera de 0-14 se rechaza", async () => {
-    const f = mockApi([{ path: "/api/v1/equipos", body: [] }]);
+    const f = mockApi([{ path: "/api/v1/equipos", body: [] }, SIN_PREDICCIONES]);
     renderWithProviders(<EquiposPage />);
     await userEvent.click(await screen.findByRole("button", { name: /nuevo equipo/i }));
     await llenar({ params: { ph: 15 } });
@@ -136,7 +139,7 @@ describe("EquiposPage", () => {
   });
 
   it("rechaza serie vacía, RUC inválido y fecha futura", async () => {
-    const f = mockApi([{ path: "/api/v1/equipos", body: [] }]);
+    const f = mockApi([{ path: "/api/v1/equipos", body: [] }, SIN_PREDICCIONES]);
     renderWithProviders(<EquiposPage />);
     await userEvent.click(await screen.findByRole("button", { name: /nuevo equipo/i }));
     await llenar({ serie: " ", ruc: "123", fecha: "2999-01-01" });
@@ -150,6 +153,7 @@ describe("EquiposPage", () => {
   it("muestra el 409 de serie duplicada", async () => {
     mockApi([
       { path: "/api/v1/equipos", body: [] },
+      SIN_PREDICCIONES,
       { method: "POST", path: "/api/v1/equipos", status: 409, body: { detail: "Ya existe un equipo con esa serie" } },
     ]);
     renderWithProviders(<EquiposPage />);
@@ -157,5 +161,43 @@ describe("EquiposPage", () => {
     await llenar();
     await userEvent.click(screen.getByRole("button", { name: /guardar/i }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Ya existe un equipo con esa serie");
+  });
+
+  it("equipo sin predicción muestra el badge «Sin evaluar»", async () => {
+    mockApi([{ path: "/api/v1/equipos", body: [EQUIPO] }, SIN_PREDICCIONES]);
+    renderWithProviders(<EquiposPage />);
+    expect(await screen.findByText("Sin evaluar")).toBeInTheDocument();
+  });
+
+  it("equipo con predicción ROJO muestra el badge y el panel de alertas", async () => {
+    mockApi([
+      { path: "/api/v1/equipos", body: [EQUIPO] },
+      { path: "/api/v1/equipos/predicciones-rul", body: [{ equipo_serie: "RO-2026-0001", dias_vida_util_remanente: 12, nivel_alerta: "ROJO" }] },
+    ]);
+    renderWithProviders(<EquiposPage />);
+    expect(await screen.findByText(/rojo/i)).toBeInTheDocument();
+    expect(screen.getByText(/riesgo crítico/i)).toBeInTheDocument();
+    expect(screen.getByText(/RO-2026-0001 — 12 días restantes/i)).toBeInTheDocument();
+  });
+
+  it("sin equipos en ROJO no muestra el panel de alertas", async () => {
+    mockApi([
+      { path: "/api/v1/equipos", body: [EQUIPO] },
+      { path: "/api/v1/equipos/predicciones-rul", body: [{ equipo_serie: "RO-2026-0001", dias_vida_util_remanente: 200, nivel_alerta: "VERDE" }] },
+    ]);
+    renderWithProviders(<EquiposPage />);
+    await screen.findByText(/verde/i);
+    expect(screen.queryByText(/riesgo crítico/i)).not.toBeInTheDocument();
+  });
+
+  it("si falla la consulta de predicciones, la tabla de equipos igual se renderiza", async () => {
+    mockApi([
+      { path: "/api/v1/equipos", body: [EQUIPO] },
+      { path: "/api/v1/equipos/predicciones-rul", status: 500, body: { detail: "Error interno" } },
+    ]);
+    renderWithProviders(<EquiposPage />);
+    expect(await screen.findByText("RO-2026-0001")).toBeInTheDocument();
+    expect(screen.getByText("Sin evaluar")).toBeInTheDocument();
+    expect(screen.queryByText(/riesgo crítico/i)).not.toBeInTheDocument();
   });
 });
