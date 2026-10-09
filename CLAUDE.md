@@ -241,9 +241,9 @@ CREATE TABLE predicciones_rul (
     - [x] 3.3.3 Publicar PWA y Web en Cloudflare Pages (`https://fildlab.pages.dev` y `https://fildlab-pwa.pages.dev`)
 
 - [ ] **Fase 4: Integración Analítica y Pruebas**
-  - [ ] 4.1 Módulo de Business Intelligence (Apache ECharts)
-    - [ ] 4.1.1 Tablero de rentabilidad financiera por contrato
-    - [ ] 4.1.2 Tablero de seguimiento y alertas de SLA (< 2%)
+  - [x] 4.1 Módulo de Business Intelligence (Apache ECharts)
+    - [x] 4.1.1 Tablero de rentabilidad financiera por contrato
+    - [x] 4.1.2 Tablero de seguimiento y alertas de SLA (< 2%)
   - [ ] 4.2 Módulo de Inteligencia Artificial (RUL y Supervivencia)
     - [ ] 4.2.1 Preparación y depuración de historiales técnicos
     - [ ] 4.2.2 Pipeline de supervivencia (lifelines / Cox PH)
