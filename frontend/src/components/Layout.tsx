@@ -1,7 +1,7 @@
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { Rol, useAuth } from "../auth/AuthContext";
 
-type IconoId = "clientes" | "contratos" | "equipos" | "inventario" | "ventas" | "liquidacion";
+type IconoId = "clientes" | "contratos" | "equipos" | "inventario" | "ventas" | "liquidacion" | "bi";
 
 const ICONOS: Record<IconoId, string> = {
   clientes: "M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6M9 10h.01M15 10h.01M9 14h.01M15 14h.01",
@@ -10,6 +10,7 @@ const ICONOS: Record<IconoId, string> = {
   inventario: "M4 7l8-4 8 4-8 4-8-4zm0 0v10l8 4m0-14v14m8-14v10l-8 4",
   ventas: "M4 8h16v11a1 1 0 01-1 1H5a1 1 0 01-1-1V8zm2 0V6a2 2 0 012-2h8a2 2 0 012 2v2",
   liquidacion: "M12 3v18M6 7l-3 6a3 3 0 006 0l-3-6zm12 0l-3 6a3 3 0 006 0l-3-6zM3 7h6m6 0h6",
+  bi: "M4 19V9m6 10V5m6 14v-7",
 };
 
 function Icono({ id, className }: { id: IconoId; className?: string }) {
@@ -27,6 +28,7 @@ const ENLACES: { to: string; texto: string; icon: IconoId; roles: Rol[] }[] = [
   { to: "/inventario", texto: "Inventario", icon: "inventario", roles: ["GERENCIA", "TECNICO"] },
   { to: "/ventas", texto: "Ventas", icon: "ventas", roles: ["GERENCIA"] },
   { to: "/liquidacion", texto: "Liquidación", icon: "liquidacion", roles: ["GERENCIA"] },
+  { to: "/bi", texto: "BI", icon: "bi", roles: ["GERENCIA"] },
 ];
 
 export function Layout() {

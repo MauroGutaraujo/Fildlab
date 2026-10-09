@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { LoginPage } from "./auth/LoginPage";
 import { RequireRole } from "./auth/RequireRole";
 import { Layout } from "./components/Layout";
+import { BiPage } from "./features/bi/BiPage";
 import { ClientesPage } from "./features/clientes/ClientesPage";
 import { ContratosPage } from "./features/contratos/ContratosPage";
 import { EquiposPage } from "./features/equipos/EquiposPage";
@@ -38,6 +39,14 @@ export function AppRoutes() {
           element={
             <RequireRole roles={["GERENCIA"]}>
               <LiquidacionPage />
+            </RequireRole>
+          }
+        />
+        <Route
+          path="bi"
+          element={
+            <RequireRole roles={["GERENCIA"]}>
+              <BiPage />
             </RequireRole>
           }
         />
