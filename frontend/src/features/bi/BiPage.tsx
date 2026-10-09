@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { TableroRentabilidad } from "./TableroRentabilidad";
+import { TableroSla } from "./TableroSla";
 
 function periodoActual(): string {
   return new Date().toISOString().slice(0, 7);
@@ -22,7 +24,10 @@ export function BiPage() {
           />
         </label>
       </div>
-      <div className="grid gap-6">{/* TableroRentabilidad y TableroSla se agregan en el Task 7 */}</div>
+      <div className="grid gap-6">
+        <TableroRentabilidad periodo={periodo} />
+        <TableroSla periodo={periodo} />
+      </div>
     </section>
   );
 }
