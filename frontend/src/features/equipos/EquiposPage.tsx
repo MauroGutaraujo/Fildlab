@@ -122,6 +122,11 @@ export function EquiposPage() {
   const prediccionPorSerie = new Map((predicciones.data ?? []).map((p) => [p.equipo_serie, p]));
   const enRiesgo = (predicciones.data ?? []).filter((p) => p.nivel_alerta === "ROJO");
   const [detalleEquipo, setDetalleEquipo] = useState<Equipo | null>(null);
+  const [mantenimientoConfirmado, setMantenimientoConfirmado] = useState<string | null>(null);
+  const marcarMantenimiento = useMutation({
+    mutationFn: (serie: string) => apiFetch<Equipo>(`/equipos/${serie}/marcar-mantenimiento`, { method: "POST" }),
+    onSuccess: (_equipo, serie) => setMantenimientoConfirmado(serie),
+  });
 
   const [abierto, setAbierto] = useState(false);
   const [serie, setSerie] = useState("");
@@ -268,7 +273,30 @@ export function EquiposPage() {
               </button>
             ),
           },
-          { header: "RUL", cell: (e) => <BadgeAlerta prediccion={prediccionPorSerie.get(e.serie)} /> },
+          {
+            header: "RUL",
+            cell: (e) => (
+              <div className="flex flex-col items-start gap-1">
+                <BadgeAlerta prediccion={prediccionPorSerie.get(e.serie)} />
+                {puedeEscribir && (
+                  mantenimientoConfirmado === e.serie ? (
+                    <span className="text-xs font-medium text-emerald-600">
+                      Registrado — se reflejará en el próximo cálculo
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => marcarMantenimiento.mutate(e.serie)}
+                      disabled={marcarMantenimiento.isPending}
+                      className="text-xs font-semibold text-blue-600 hover:text-blue-800 hover:underline cursor-pointer disabled:opacity-60"
+                    >
+                      Marcar mantenimiento
+                    </button>
+                  )
+                )}
+              </div>
+            ),
+          },
         ]}
       />
 

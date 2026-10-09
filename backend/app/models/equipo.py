@@ -21,3 +21,8 @@ class Equipo(Base):
     tipo_sistema: Mapped[str] = mapped_column(String(50))
     fecha_instalacion: Mapped[date] = mapped_column(Date)
     parametros_nominales: Mapped[dict] = mapped_column(JSONB)
+    # Ultimo reemplazo/mantenimiento registrado por Gerencia (RN-01). El batch de RUL
+    # (app/ml/batch_predicciones.py) cuenta los "dias en servicio" desde esta fecha en vez
+    # de fecha_instalacion cuando esta presente, para que el reloj de vida util remanente
+    # se pueda reiniciar sin tener que dar de baja y re-crear el equipo.
+    fecha_ultima_mantencion: Mapped[date | None] = mapped_column(Date, nullable=True)

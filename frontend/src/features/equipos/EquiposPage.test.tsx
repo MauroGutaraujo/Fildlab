@@ -219,4 +219,25 @@ describe("EquiposPage", () => {
     expect(screen.getByText("Sin evaluar")).toBeInTheDocument();
     expect(await screen.findByText(/no se pudieron cargar las predicciones/i)).toBeInTheDocument();
   });
+
+  it("GERENCIA puede marcar un equipo como mantenido, y ve la confirmación", async () => {
+    const f = mockApi([
+      { path: "/api/v1/equipos", body: [EQUIPO] },
+      SIN_PREDICCIONES,
+      { method: "POST", path: "/api/v1/equipos/RO-2026-0001/marcar-mantenimiento", body: { ...EQUIPO, fecha_ultima_mantencion: "2026-10-09" } },
+    ]);
+    renderWithProviders(<EquiposPage />);
+    await screen.findByText("RO-2026-0001");
+    await userEvent.click(screen.getByRole("button", { name: /marcar mantenimiento/i }));
+    expect(await screen.findByText(/registrado/i)).toBeInTheDocument();
+    const llamadas = f.mock.calls.map(([u, i]) => `${(i as RequestInit | undefined)?.method ?? "GET"} ${String(u)}`);
+    expect(llamadas).toContain("POST /api/v1/equipos/RO-2026-0001/marcar-mantenimiento");
+  });
+
+  it("TECNICO no ve el botón de marcar mantenimiento", async () => {
+    mockApi([{ path: "/api/v1/equipos", body: [EQUIPO] }, SIN_PREDICCIONES]);
+    renderWithProviders(<EquiposPage />, { rol: "TECNICO" });
+    await screen.findByText("RO-2026-0001");
+    expect(screen.queryByRole("button", { name: /marcar mantenimiento/i })).not.toBeInTheDocument();
+  });
 });

@@ -8,11 +8,13 @@ from app.models.equipo import Equipo
 from app.models.prediccion_rul import PrediccionRul
 
 
-async def _equipo(db, crear_cliente, *, serie, tipo_sistema, fecha_instalacion, ruc="20612493821"):
+async def _equipo(db, crear_cliente, *, serie, tipo_sistema, fecha_instalacion, ruc="20612493821",
+                   fecha_ultima_mantencion=None):
     if await db.get(Cliente, ruc) is None:
         await crear_cliente(ruc)
     e = Equipo(serie=serie, cliente_ruc=ruc, tipo_sistema=tipo_sistema,
-              fecha_instalacion=fecha_instalacion, parametros_nominales={})
+              fecha_instalacion=fecha_instalacion, parametros_nominales={},
+              fecha_ultima_mantencion=fecha_ultima_mantencion)
     db.add(e)
     await db.flush()
     return e
@@ -61,6 +63,25 @@ async def test_batch_sin_equipos_no_falla(db):
     await correr_batch(session=db)
     total = (await db.execute(select(func.count()).select_from(PrediccionRul))).scalar()
     assert total == 0
+
+
+async def test_batch_cuenta_antiguedad_desde_la_ultima_mantencion_no_desde_instalacion(db, crear_cliente):
+    """Equipo instalado hace mucho tiempo (quedaria en 0 dias/ROJO), pero con un
+    mantenimiento reciente registrado — el reloj debe reiniciarse desde esa fecha."""
+    instalado_hace_mucho = date(2020, 1, 1)
+    mantenido_hace_poco = date.today() - timedelta(days=5)
+    await _equipo(db, crear_cliente, serie="EQ-MANTENIDO", tipo_sistema="FILTRO",
+                 fecha_instalacion=instalado_hace_mucho, fecha_ultima_mantencion=mantenido_hace_poco)
+    await _equipo(db, crear_cliente, serie="EQ-SIN-MANTENER", tipo_sistema="FILTRO",
+                 fecha_instalacion=instalado_hace_mucho)
+    await db.commit()
+
+    await correr_batch(session=db)
+
+    mantenido = await db.get(PrediccionRul, "EQ-MANTENIDO")
+    sin_mantener = await db.get(PrediccionRul, "EQ-SIN-MANTENER")
+    assert mantenido.dias_vida_util_remanente > sin_mantener.dias_vida_util_remanente
+    assert sin_mantener.dias_vida_util_remanente == 0
 
 
 async def test_batch_omite_tipo_sistema_no_reconocido(db, crear_cliente, monkeypatch):

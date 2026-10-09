@@ -1,3 +1,5 @@
+from datetime import date
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -82,5 +84,15 @@ async def actualizar(serie: str, datos: EquipoUpdate, session: AsyncSession = De
         if valor is None and campo != "contrato_id":
             continue  # fecha/parámetros no se pueden borrar
         setattr(equipo, campo, valor)
+    await session.flush()
+    return equipo
+
+
+@router.post("/{serie}/marcar-mantenimiento", response_model=EquipoOut, dependencies=[solo_gerencia])
+async def marcar_mantenimiento(serie: str, session: AsyncSession = Depends(get_session)):
+    """RN-01: solo Gerencia reinicia el reloj de vida util remanente. El batch de RUL
+    cuenta los dias en servicio desde esta fecha en vez de fecha_instalacion."""
+    equipo = await _obtener(session, serie)
+    equipo.fecha_ultima_mantencion = date.today()
     await session.flush()
     return equipo

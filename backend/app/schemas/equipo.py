@@ -65,3 +65,4 @@ class EquipoOut(BaseModel):
     tipo_sistema: str
     fecha_instalacion: date
     parametros_nominales: dict[str, Any]
+    fecha_ultima_mantencion: date | None

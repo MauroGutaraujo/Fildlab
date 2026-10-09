@@ -34,8 +34,11 @@ async def _ejecutar(session: AsyncSession) -> None:
         if e.tipo_sistema not in TIPOS_SISTEMA:
             print(f"WARN: equipo {e.serie} omitido — tipo_sistema desconocido: {e.tipo_sistema}")
             continue
+        # El reloj de vida util remanente se reinicia desde el ultimo mantenimiento
+        # registrado (app/api/v1/equipos.py::marcar_mantenimiento), si existe uno.
+        fecha_referencia = e.fecha_ultima_mantencion or e.fecha_instalacion
         try:
-            r = calificar_equipo(cph, e.tipo_sistema, e.fecha_instalacion, hoy)
+            r = calificar_equipo(cph, e.tipo_sistema, fecha_referencia, hoy)
         except ParametrosImposibles as exc:
             print(f"WARN: equipo {e.serie} omitido — {exc}")
             continue
