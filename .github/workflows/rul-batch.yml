@@ -1,0 +1,23 @@
+name: Batch de predicciones RUL
+
+on:
+  schedule:
+    - cron: "0 8 * * *"  # 03:00 hora de Lima (UTC-5) = 08:00 UTC
+  workflow_dispatch: {}
+
+jobs:
+  predecir:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Instalar dependencias
+        working-directory: backend
+        run: pip install -e ".[ml]"
+      - name: Correr el batch de predicciones RUL
+        working-directory: backend
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL_PROD }}
+        run: python -m app.ml.batch_predicciones
