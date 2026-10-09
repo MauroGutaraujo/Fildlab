@@ -130,3 +130,70 @@ async def test_rentabilidad_dos_contratos_no_mezclan_costos(client, gerente_h, d
     por_id = {c["contrato_id"]: c["costo_repuestos_soles"] for c in r.json()["contratos"]}
     assert por_id[c1.id] == "5.00"
     assert por_id[c2.id] == "15.00"
+
+
+async def test_sla_solo_gerencia(client, tecnico_h):
+    assert (await client.get("/api/v1/analytics/sla?periodo=2026-09", headers=tecnico_h)).status_code == 403
+
+
+async def test_sla_periodo_invalido_422(client, gerente_h):
+    assert (await client.get("/api/v1/analytics/sla?periodo=no-es-un-mes", headers=gerente_h)).status_code == 422
+
+
+async def test_sla_sin_ordenes_en_el_mes(client, gerente_h):
+    r = await client.get("/api/v1/analytics/sla?periodo=2026-09", headers=gerente_h)
+    assert r.status_code == 200
+    assert r.json() == {"periodo": "2026-09", "total_ordenes": 0, "ordenes_fuera_sla": [], "pct_cumplimiento": None}
+
+
+async def test_sla_orden_que_excede_el_maximo_aparece_en_fuera_de_sla(client, gerente_h, db, crear_cliente, crear_usuario):
+    contrato = await _contrato(db, crear_cliente, sla=4)
+    await _orden(db, contrato, crear_usuario, estado="SINCRONIZADA",
+                fecha=datetime(2026, 9, 10, tzinfo=timezone.utc), tiempo_respuesta=Decimal("9.50"))
+    await db.commit()
+
+    r = await client.get("/api/v1/analytics/sla?periodo=2026-09", headers=gerente_h)
+    b = r.json()
+    assert b["total_ordenes"] == 1
+    assert len(b["ordenes_fuera_sla"]) == 1
+    assert b["ordenes_fuera_sla"][0]["tiempo_respuesta_horas"] == "9.50"
+    assert b["ordenes_fuera_sla"][0]["sla_horas_max_respuesta"] == 4
+    assert b["pct_cumplimiento"] == pytest.approx(0.0)
+
+
+async def test_sla_orden_exactamente_en_el_limite_cuenta_como_cumplida(client, gerente_h, db, crear_cliente, crear_usuario):
+    contrato = await _contrato(db, crear_cliente, sla=4)
+    await _orden(db, contrato, crear_usuario, fecha=datetime(2026, 9, 10, tzinfo=timezone.utc),
+                tiempo_respuesta=Decimal("4.00"))
+    await db.commit()
+
+    r = await client.get("/api/v1/analytics/sla?periodo=2026-09", headers=gerente_h)
+    b = r.json()
+    assert b["ordenes_fuera_sla"] == []
+    assert b["pct_cumplimiento"] == pytest.approx(100.0)
+
+
+async def test_sla_orden_sin_tiempo_de_respuesta_aun_no_rompe_el_calculo(client, gerente_h, db, crear_cliente, crear_usuario):
+    contrato = await _contrato(db, crear_cliente, sla=4)
+    await _orden(db, contrato, crear_usuario, fecha=datetime(2026, 9, 10, tzinfo=timezone.utc), tiempo_respuesta=None)
+    await db.commit()
+
+    r = await client.get("/api/v1/analytics/sla?periodo=2026-09", headers=gerente_h)
+    b = r.json()
+    assert b["total_ordenes"] == 1
+    assert b["ordenes_fuera_sla"] == []
+    assert b["pct_cumplimiento"] == pytest.approx(100.0)
+
+
+async def test_sla_cuenta_ordenes_sin_importar_el_estado(client, gerente_h, db, crear_cliente, crear_usuario):
+    contrato = await _contrato(db, crear_cliente, sla=4)
+    await _orden(db, contrato, crear_usuario, estado="SINCRONIZADA",
+                fecha=datetime(2026, 9, 5, tzinfo=timezone.utc), tiempo_respuesta=Decimal("2.00"))
+    await _orden(db, contrato, crear_usuario, estado="COMPROMETIDA",
+                fecha=datetime(2026, 9, 6, tzinfo=timezone.utc), tiempo_respuesta=Decimal("2.00"))
+    await _orden(db, contrato, crear_usuario, estado="LIQUIDADA",
+                fecha=datetime(2026, 9, 7, tzinfo=timezone.utc), tiempo_respuesta=Decimal("2.00"))
+    await db.commit()
+
+    r = await client.get("/api/v1/analytics/sla?periodo=2026-09", headers=gerente_h)
+    assert r.json()["total_ordenes"] == 3

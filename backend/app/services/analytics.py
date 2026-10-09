@@ -66,3 +66,57 @@ async def rentabilidad_por_contrato(session: AsyncSession, periodo: str) -> list
             }
         )
     return resultado
+
+
+async def cumplimiento_sla(session: AsyncSession, periodo: str) -> dict:
+    inicio, fin = _rango_mes(periodo)
+
+    total_ordenes = (
+        await session.execute(
+            select(func.count())
+            .select_from(OrdenServicio)
+            .where(OrdenServicio.fecha_creacion_cliente >= inicio, OrdenServicio.fecha_creacion_cliente < fin)
+        )
+    ).scalar_one()
+
+    filas = (
+        await session.execute(
+            select(
+                OrdenServicio.id,
+                OrdenServicio.equipo_serie,
+                OrdenServicio.tiempo_respuesta_horas,
+                Contrato.sla_horas_max_respuesta,
+                Cliente.razon_social,
+            )
+            .select_from(OrdenServicio)
+            .join(Contrato, Contrato.id == OrdenServicio.contrato_id)
+            .join(Cliente, Cliente.ruc == Contrato.cliente_ruc)
+            .where(
+                OrdenServicio.fecha_creacion_cliente >= inicio,
+                OrdenServicio.fecha_creacion_cliente < fin,
+                OrdenServicio.tiempo_respuesta_horas > Contrato.sla_horas_max_respuesta,
+            )
+            .order_by(OrdenServicio.fecha_creacion_cliente)
+        )
+    ).all()
+
+    ordenes_fuera_sla = [
+        {
+            "orden_id": orden_id,
+            "equipo_serie": equipo_serie,
+            "razon_social": razon_social,
+            "tiempo_respuesta_horas": tiempo,
+            "sla_horas_max_respuesta": sla_max,
+        }
+        for orden_id, equipo_serie, tiempo, sla_max, razon_social in filas
+    ]
+
+    pct_cumplimiento = (
+        (total_ordenes - len(ordenes_fuera_sla)) / total_ordenes * 100 if total_ordenes > 0 else None
+    )
+
+    return {
+        "total_ordenes": total_ordenes,
+        "ordenes_fuera_sla": ordenes_fuera_sla,
+        "pct_cumplimiento": pct_cumplimiento,
+    }
