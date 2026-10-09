@@ -34,5 +34,6 @@ class OrdenFueraSlaOut(BaseModel):
 class SlaOut(BaseModel):
     periodo: str
     total_ordenes: int
+    ordenes_sin_medicion: int
     ordenes_fuera_sla: list[OrdenFueraSlaOut]
     pct_cumplimiento: float | None

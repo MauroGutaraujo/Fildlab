@@ -12,7 +12,13 @@ type OrdenFueraSla = {
   tiempo_respuesta_horas: string;
   sla_horas_max_respuesta: number;
 };
-type SlaResp = { periodo: string; total_ordenes: number; ordenes_fuera_sla: OrdenFueraSla[]; pct_cumplimiento: number | null };
+type SlaResp = {
+  periodo: string;
+  total_ordenes: number;
+  ordenes_sin_medicion: number;
+  ordenes_fuera_sla: OrdenFueraSla[];
+  pct_cumplimiento: number | null;
+};
 
 export function TableroSla({ periodo }: { periodo: string }) {
   const { data, isLoading, error } = useQuery({
@@ -48,7 +54,17 @@ export function TableroSla({ periodo }: { periodo: string }) {
     );
   }
 
-  const pct = data.pct_cumplimiento ?? 0;
+  if (data.pct_cumplimiento === null) {
+    return (
+      <div className="rounded-2xl border border-dashed border-amber-200 bg-amber-50/60 p-8 text-center shadow-xs">
+        <p className="text-sm font-medium text-amber-700">
+          Ninguna de las {data.total_ordenes} órdenes del periodo tiene tiempo de respuesta medido todavía.
+        </p>
+      </div>
+    );
+  }
+
+  const pct = data.pct_cumplimiento;
   const option = {
     series: [
       {
@@ -66,6 +82,11 @@ export function TableroSla({ periodo }: { periodo: string }) {
     <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
       <h2 className="text-base font-bold text-slate-800 mb-2">Cumplimiento de SLA</h2>
       <ReactEChartsCore echarts={echarts} option={option} style={{ height: 280 }} />
+      {data.ordenes_sin_medicion > 0 && (
+        <p className="mt-2 text-xs font-medium text-amber-600">
+          {data.ordenes_sin_medicion} orden(es) sin tiempo de respuesta medido, excluidas del cálculo.
+        </p>
+      )}
       {data.ordenes_fuera_sla.length > 0 ? (
         <DataTable
           rows={data.ordenes_fuera_sla}
