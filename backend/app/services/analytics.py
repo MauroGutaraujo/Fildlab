@@ -2,7 +2,7 @@ from datetime import datetime
 from decimal import Decimal
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.cliente import Cliente
@@ -39,16 +39,20 @@ async def rentabilidad_por_contrato(session: AsyncSession, periodo: str) -> list
         )
     ).all()
 
+    # RN-04: una adenda nunca edita el acta firmada; registra el ajuste como AJUSTE_SALIDA (consumo
+    # adicional hallado despues) o AJUSTE_ENTRADA (stock devuelto). El costo "real" del periodo debe
+    # reflejar esas correcciones, no solo el consumo original de SALIDA_ORDEN.
+    signo = case((MovimientoInventario.tipo == "AJUSTE_ENTRADA", -1), else_=1)
     costos_q = (
         select(
             OrdenServicio.contrato_id,
-            func.sum(MovimientoInventario.cantidad * Repuesto.costo_unitario_soles).label("costo"),
+            func.sum(MovimientoInventario.cantidad * Repuesto.costo_unitario_soles * signo).label("costo"),
         )
         .select_from(MovimientoInventario)
         .join(OrdenServicio, OrdenServicio.id == MovimientoInventario.orden_id)
         .join(Repuesto, Repuesto.codigo == MovimientoInventario.repuesto_codigo)
         .where(
-            MovimientoInventario.tipo == "SALIDA_ORDEN",
+            MovimientoInventario.tipo.in_(("SALIDA_ORDEN", "AJUSTE_SALIDA", "AJUSTE_ENTRADA")),
             OrdenServicio.estado == "LIQUIDADA",
             OrdenServicio.fecha_creacion_cliente >= inicio,
             OrdenServicio.fecha_creacion_cliente < fin,
@@ -88,6 +92,21 @@ async def cumplimiento_sla(session: AsyncSession, periodo: str) -> dict:
         )
     ).scalar_one()
 
+    # RN-02/REQ-15 todavia no tiene ningun productor de tiempo_respuesta_horas en el sistema (columna
+    # declarada pero nunca escrita). Si lo tratamos como "cumple", el tablero muestra 100% falso. Se
+    # distinguen las ordenes medidas de las que no, y el % de cumplimiento se calcula solo sobre las medidas.
+    medidas = (
+        await session.execute(
+            select(func.count())
+            .select_from(OrdenServicio)
+            .where(
+                OrdenServicio.fecha_creacion_cliente >= inicio,
+                OrdenServicio.fecha_creacion_cliente < fin,
+                OrdenServicio.tiempo_respuesta_horas.is_not(None),
+            )
+        )
+    ).scalar_one()
+
     filas = (
         await session.execute(
             select(
@@ -120,12 +139,11 @@ async def cumplimiento_sla(session: AsyncSession, periodo: str) -> dict:
         for orden_id, equipo_serie, tiempo, sla_max, razon_social in filas
     ]
 
-    pct_cumplimiento = (
-        (total_ordenes - len(ordenes_fuera_sla)) / total_ordenes * 100 if total_ordenes > 0 else None
-    )
+    pct_cumplimiento = (medidas - len(ordenes_fuera_sla)) / medidas * 100 if medidas > 0 else None
 
     return {
         "total_ordenes": total_ordenes,
+        "ordenes_sin_medicion": total_ordenes - medidas,
         "ordenes_fuera_sla": ordenes_fuera_sla,
         "pct_cumplimiento": pct_cumplimiento,
     }
