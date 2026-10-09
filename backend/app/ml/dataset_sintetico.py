@@ -10,7 +10,6 @@ CALIBRACION = {
     "ABLANDADOR": {"mediana_dias": 1460, "min_dias": 730, "max_dias": 2920},
     "FILTRO": {"mediana_dias": 120, "min_dias": 60, "max_dias": 270},
 }
-PROPORCION_EVENTO = 0.70  # 70% falla (evento observado), 30% censurado
 SEMILLA = 20261009
 
 
@@ -23,9 +22,16 @@ def generar_dataset(n_por_tipo: int = 500, semilla: int = SEMILLA) -> pd.DataFra
     for tipo, cal in CALIBRACION.items():
         forma = 1.5  # forma de Weibull calibrada para que la mediana caiga en mediana_dias
         escala = cal["mediana_dias"] / (np.log(2) ** (1 / forma))
-        duraciones = rng.weibull(forma, n_por_tipo) * escala
+        fallas = rng.weibull(forma, n_por_tipo) * escala
+        # El tiempo de censura es independiente del tiempo de falla real — practica estandar
+        # en analisis de supervivencia. Si se censura justo en el mismo instante de la falla
+        # (lo que hacia la version anterior), Kaplan-Meier/Cox leen eso como "sobrevivio mas
+        # alla de ese punto sin saberse que paso despues", inflando la mediana estimada muy
+        # por encima de la calibracion documentada.
+        censura = rng.uniform(cal["min_dias"], cal["max_dias"], n_por_tipo)
+        duraciones = np.minimum(fallas, censura)
+        eventos = fallas <= censura
         duraciones = np.clip(duraciones, cal["min_dias"], cal["max_dias"])
-        eventos = rng.random(n_por_tipo) < PROPORCION_EVENTO
         for d, e in zip(duraciones, eventos):
             filas.append({"duracion_dias": float(d), "evento": int(e), "tipo_sistema": tipo})
     return pd.DataFrame(filas)

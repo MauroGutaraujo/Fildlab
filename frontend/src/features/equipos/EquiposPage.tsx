@@ -193,16 +193,22 @@ export function EquiposPage() {
         </FormPanel>
       )}
 
-      {enRiesgo.length > 0 && (
-        <div className="mb-4 rounded-2xl border border-red-200 bg-red-50/60 p-4">
-          <h2 className="text-sm font-bold text-red-800 mb-1">Equipos en riesgo crítico de falla</h2>
+      <div className="mb-4 rounded-2xl border border-red-200 bg-red-50/60 p-4">
+        <h2 className="text-sm font-bold text-red-800 mb-1">Equipos en riesgo crítico de falla</h2>
+        {predicciones.isLoading ? (
+          <p className="text-sm text-red-700">Cargando…</p>
+        ) : predicciones.isError ? (
+          <p className="text-sm text-red-700">No se pudieron cargar las predicciones RUL</p>
+        ) : enRiesgo.length === 0 ? (
+          <p className="text-sm text-red-700">Sin datos disponibles</p>
+        ) : (
           <ul className="text-sm text-red-700 list-disc list-inside">
             {enRiesgo.map((p) => (
               <li key={p.equipo_serie}>{p.equipo_serie} — {p.dias_vida_util_remanente} días restantes</li>
             ))}
           </ul>
-        </div>
-      )}
+        )}
+      </div>
 
       <DataTable
         rows={data}

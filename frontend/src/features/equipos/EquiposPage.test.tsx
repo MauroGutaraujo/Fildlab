@@ -75,7 +75,10 @@ describe("EquiposPage", () => {
   it("lista vacía muestra «Sin datos disponibles»", async () => {
     mockApi([{ path: "/api/v1/equipos", body: [] }, SIN_PREDICCIONES]);
     renderWithProviders(<EquiposPage />);
-    expect(await screen.findByText("Sin datos disponibles")).toBeInTheDocument();
+    // El panel de riesgo RUL y la tabla de equipos comparten el mismo texto de vacío
+    // (REQ-16) cuando ambos estan vacios a la vez — ambas ocurrencias son legitimas.
+    const mensajes = await screen.findAllByText("Sin datos disponibles");
+    expect(mensajes.length).toBeGreaterThanOrEqual(1);
   });
 
   it("ofrece los tres tipos de sistema", async () => {
@@ -187,10 +190,11 @@ describe("EquiposPage", () => {
     ]);
     renderWithProviders(<EquiposPage />);
     await screen.findByText(/verde/i);
-    expect(screen.queryByText(/riesgo crítico/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/riesgo crítico/i)).toBeInTheDocument();
+    expect(screen.getByText("Sin datos disponibles")).toBeInTheDocument();
   });
 
-  it("si falla la consulta de predicciones, la tabla de equipos igual se renderiza", async () => {
+  it("si falla la consulta de predicciones, el panel avisa el error sin bloquear la tabla", async () => {
     mockApi([
       { path: "/api/v1/equipos", body: [EQUIPO] },
       { path: "/api/v1/equipos/predicciones-rul", status: 500, body: { detail: "Error interno" } },
@@ -198,6 +202,6 @@ describe("EquiposPage", () => {
     renderWithProviders(<EquiposPage />);
     expect(await screen.findByText("RO-2026-0001")).toBeInTheDocument();
     expect(screen.getByText("Sin evaluar")).toBeInTheDocument();
-    expect(screen.queryByText(/riesgo crítico/i)).not.toBeInTheDocument();
+    expect(await screen.findByText(/no se pudieron cargar las predicciones/i)).toBeInTheDocument();
   });
 });
