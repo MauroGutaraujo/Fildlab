@@ -90,6 +90,7 @@ export function TableroSla({ periodo }: { periodo: string }) {
   const promedioPactado = limitesConocidos.length
     ? limitesConocidos.reduce((s, sla) => s + sla, 0) / limitesConocidos.length
     : null;
+  const promedioPactadoCompleto = promedioPactado !== null && limitesConocidos.length === mediblesDelPeriodo.length;
   const medidos = Math.max(0, data.total_ordenes - data.ordenes_sin_medicion);
   const retrasos = data.ordenes_fuera_sla.length;
   const aTiempo = Math.max(0, medidos - retrasos);
@@ -120,7 +121,7 @@ export function TableroSla({ periodo }: { periodo: string }) {
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-blue-700">Atención de órdenes</p>
           <h2 className="mt-1 text-xl font-bold tracking-tight text-slate-950">Cumplimiento de SLA</h2>
           <p className={`mt-3 inline-flex rounded-full border px-3 py-1.5 text-sm font-semibold ${enNorma ? "border-emerald-200 bg-emerald-100 text-emerald-900" : "border-amber-200 bg-amber-100 text-amber-900"}`}>
-            {pct === null ? "Sin mediciones de SLA" : enNorma ? "SLA en Norma (Meta > 98%)" : "Riesgo de Penalización Contractual"}
+            {pct === null ? "Sin mediciones de SLA" : enNorma ? "SLA en Norma (Meta ≥ 98%)" : "Riesgo de Penalización Contractual"}
           </p>
           <p className="mt-2 text-sm text-slate-600">Meta corporativa: mantener los servicios fuera de SLA por debajo del 2% (cumplimiento ≥ 98%).</p>
         </div>
@@ -140,8 +141,8 @@ export function TableroSla({ periodo }: { periodo: string }) {
             <p role="status" className="mt-4 text-sm text-amber-800">No se pudieron cargar los datos de órdenes para calcular el tiempo promedio.</p>
           ) : promedio !== null ? (
             <>
-              <p className="mt-4 text-2xl font-bold tabular-nums text-slate-950">{promedio.toFixed(1)} h <span className="text-sm font-medium text-slate-500">{contratos.isLoading ? "calculando SLA pactado…" : promedioPactado !== null ? `de ${promedioPactado.toFixed(1)} h pactadas` : "SLA pactado no disponible"}</span></p>
-              {promedioPactado !== null && limitesConocidos.length !== mediblesDelPeriodo.length && <p className="mt-1 text-xs text-slate-500">SLA pactado promedio calculado para {limitesConocidos.length} de {mediblesDelPeriodo.length} servicios medidos.</p>}
+              <p className="mt-4 text-2xl font-bold tabular-nums text-slate-950">{promedio.toFixed(1)} h <span className="text-sm font-medium text-slate-500">{contratos.isLoading ? "calculando SLA pactado…" : promedioPactadoCompleto ? `de ${promedioPactado!.toFixed(1)} h pactadas` : "SLA pactado no disponible para todos"}</span></p>
+              {promedioPactado !== null && !promedioPactadoCompleto && <p className="mt-1 text-xs text-slate-500">Comparación omitida: hay SLA contractual disponible para {limitesConocidos.length} de {mediblesDelPeriodo.length} servicios medidos.</p>}
               {contratos.isError && <p className="mt-1 text-xs text-amber-800">No se pudieron cargar los contratos para comparar con el SLA pactado.</p>}
             </>
           ) : <p className="mt-4 text-sm text-slate-500">Sin tiempos medidos disponibles para este periodo.</p>}

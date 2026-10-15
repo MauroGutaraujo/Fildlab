@@ -40,7 +40,7 @@ describe("TableroSla", () => {
       { path: "/api/v1/contratos", body: [{ id: 1, sla_horas_max_respuesta: 4 }] },
     ]);
     renderWithProviders(<TableroSla periodo="2026-09" />);
-    expect(await screen.findByText("SLA en Norma (Meta > 98%)")).toBeInTheDocument();
+    expect(await screen.findByText("SLA en Norma (Meta ≥ 98%)")).toBeInTheDocument();
     expect(globalThis.fetch).toHaveBeenCalledWith("/api/v1/ordenes", expect.anything());
     expect(screen.getByText("Tiempo Promedio de Respuesta")).toBeInTheDocument();
     expect(await screen.findByText(/2\.4 h/)).toHaveTextContent("de 4.0 h pactadas");
@@ -69,6 +69,22 @@ describe("TableroSla", () => {
     renderWithProviders(<TableroSla periodo="2026-09" />);
     expect(await screen.findByText(/no se pudieron cargar los datos de órdenes para calcular el tiempo promedio/i)).toBeInTheDocument();
     expect(screen.queryByText(/sin tiempos medidos disponibles/i)).not.toBeInTheDocument();
+  });
+
+  it("omite comparar promedios cuando faltan SLA contractuales de algunas órdenes", async () => {
+    mockApi([
+      { path: "/api/v1/analytics/sla?periodo=2026-09", body: { periodo: "2026-09", total_ordenes: 2, ordenes_sin_medicion: 0, ordenes_fuera_sla: [], pct_cumplimiento: 100 } },
+      { path: "/api/v1/ordenes", body: [
+        { id: "a", contrato_id: 1, fecha_creacion_cliente: "2026-09-10T12:00:00-05:00", tiempo_respuesta_horas: "2.00" },
+        { id: "b", contrato_id: 99, fecha_creacion_cliente: "2026-09-11T12:00:00-05:00", tiempo_respuesta_horas: "3.00" },
+      ] },
+      { path: "/api/v1/contratos", body: [{ id: 1, sla_horas_max_respuesta: 4 }] },
+    ]);
+    renderWithProviders(<TableroSla periodo="2026-09" />);
+    expect(await screen.findByText(/2\.5 h/)).toBeInTheDocument();
+    expect(screen.getByText(/sla pactado no disponible para todos/i)).toBeInTheDocument();
+    expect(screen.getByText(/comparación omitida: hay sla contractual disponible para 1 de 2/i)).toBeInTheDocument();
+    expect(screen.queryByText(/de 4\.0 h pactadas/i)).not.toBeInTheDocument();
   });
 
   it("muestra el aviso de órdenes sin medición junto con el gráfico, cuando hay mediciones parciales", async () => {
