@@ -82,11 +82,15 @@ export function VentasPage() {
   }
 
   return (
-    <section>
-      <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Ventas de repuestos</h1>
+    <section className="space-y-5">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="mb-1 text-xs font-semibold uppercase tracking-[0.16em] text-blue-700">Liquidación comercial</p>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-950">Ventas de repuestos</h1>
+          <p className="mt-1 text-sm text-slate-500">Registro de ventas y artículos facturados a clientes.</p>
+        </div>
         {puedeEscribir && !abierto && (
-          <button type="button" onClick={abrir} className="rounded bg-sky-700 px-4 py-2 text-white">
+          <button type="button" onClick={abrir} className="rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">
             Nueva venta
           </button>
         )}
@@ -97,21 +101,21 @@ export function VentasPage() {
           <FormField label="RUC del cliente" value={ruc} onChange={(e) => setRuc(e.target.value)} inputMode="numeric" error={errRuc} />
           <div className="space-y-3 sm:col-span-2">
             {items.map((it, n) => (
-              <div key={n} className="grid items-start gap-2 sm:grid-cols-[2fr_1fr_1fr_auto]">
+              <div key={n} className="grid items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 sm:grid-cols-[2fr_1fr_1fr_auto] sm:p-4">
                 <FormField label={`Código de repuesto ${n + 1}`} value={it.codigo} onChange={(e) => cambiar(n, "codigo", e.target.value)} error={errItems[n]?.codigo} />
                 <FormField label={`Cantidad ${n + 1}`} value={it.cantidad} onChange={(e) => cambiar(n, "cantidad", e.target.value)} inputMode="numeric" error={errItems[n]?.cantidad} />
                 <FormField label={`Precio unitario (S/) ${n + 1}`} value={it.precio} onChange={(e) => cambiar(n, "precio", e.target.value)} inputMode="decimal" error={errItems[n]?.precio} />
                 {items.length > 1 && (
-                  <button type="button" aria-label={`Quitar ítem ${n + 1}`} onClick={() => setItems((p) => p.filter((_, i) => i !== n))} className="mt-6 text-red-700">
+                  <button type="button" aria-label={`Quitar ítem ${n + 1}`} onClick={() => setItems((p) => p.filter((_, i) => i !== n))} className="mt-1 rounded-lg px-3 py-2 text-sm font-medium text-rose-700 hover:bg-rose-50 sm:mt-6">
                     Quitar
                   </button>
                 )}
               </div>
             ))}
-            <button type="button" onClick={() => setItems((p) => [...p, vacio()])} className="text-sky-700 hover:underline">
+            <button type="button" onClick={() => setItems((p) => [...p, vacio()])} className="rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-800 hover:bg-blue-50">
               Agregar ítem
             </button>
-            <p className="font-semibold">Total: S/ {soles(total)}</p>
+            <p className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-right font-semibold text-blue-950">Total: S/ {soles(total)}</p>
           </div>
         </FormPanel>
       )}

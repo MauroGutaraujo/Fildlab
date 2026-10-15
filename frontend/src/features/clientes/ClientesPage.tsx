@@ -67,11 +67,15 @@ export function ClientesPage() {
   }
 
   return (
-    <section>
-      <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Clientes</h1>
+    <section className="space-y-5">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="mb-1 text-xs font-semibold uppercase tracking-[0.16em] text-blue-700">Clínicas y laboratorios</p>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-950">Clientes</h1>
+          <p className="mt-1 text-sm text-slate-500">Directorio de sedes con servicios de tratamiento de agua.</p>
+        </div>
         {puedeEscribir && !abierto && (
-          <button type="button" onClick={() => abrir(null)} className="rounded bg-sky-700 px-4 py-2 text-white">
+          <button type="button" onClick={() => abrir(null)} className="rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">
             Nuevo cliente
           </button>
         )}

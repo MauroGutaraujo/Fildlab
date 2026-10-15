@@ -23,10 +23,10 @@ export function TableroRentabilidad({ periodo }: { periodo: string }) {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center p-8 rounded-2xl border border-slate-200 bg-white shadow-xs">
+      <div role="status" aria-live="polite" className="flex items-center justify-center rounded-xl border border-slate-200 bg-white p-8">
         <div className="flex flex-col items-center gap-2.5">
           <div className="h-7 w-7 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
-          <p className="text-xs font-semibold text-slate-400">Cargando rentabilidad…</p>
+          <p className="text-sm font-medium text-slate-500">Cargando rentabilidad…</p>
         </div>
       </div>
     );
@@ -35,7 +35,7 @@ export function TableroRentabilidad({ periodo }: { periodo: string }) {
   const msg = mensajeDe(error);
   if (msg) {
     return (
-      <div role="alert" className="rounded-2xl border border-red-200 bg-red-50/80 p-4 text-sm font-medium text-red-800 shadow-xs">
+      <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm font-medium text-rose-800">
         {msg}
       </div>
     );
@@ -43,7 +43,7 @@ export function TableroRentabilidad({ periodo }: { periodo: string }) {
 
   if (!data || data.contratos.length === 0) {
     return (
-      <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center shadow-xs">
+      <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center">
         <p className="text-sm font-medium text-slate-500">Sin datos disponibles para el periodo</p>
       </div>
     );
@@ -65,8 +65,11 @@ export function TableroRentabilidad({ periodo }: { periodo: string }) {
   };
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
-      <h2 className="text-base font-bold text-slate-800 mb-2">Rentabilidad por contrato</h2>
+    <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-blue-700">Contratos y repuestos</p>
+        <h2 className="mt-1 text-lg font-bold tracking-tight text-slate-900">Rentabilidad por contrato</h2>
+      </div>
       <ReactEChartsCore echarts={echarts} option={option} style={{ height: 360 }} />
     </div>
   );

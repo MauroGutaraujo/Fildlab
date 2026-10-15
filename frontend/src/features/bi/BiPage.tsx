@@ -20,9 +20,13 @@ export function BiPage() {
   const [periodo, setPeriodo] = useState(periodoActual());
 
   return (
-    <section>
-      <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Business Intelligence</h1>
+    <section className="space-y-5">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="mb-1 text-xs font-semibold uppercase tracking-[0.16em] text-blue-700">Analítica de servicio</p>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-950">Business Intelligence</h1>
+          <p className="mt-1 text-sm text-slate-500">Cumplimiento de SLA y rentabilidad contractual.</p>
+        </div>
         <label className="text-sm font-medium text-slate-700">
           Periodo
           <input
@@ -30,11 +34,11 @@ export function BiPage() {
             aria-label="Periodo"
             value={periodo}
             onChange={(e) => setPeriodo(e.target.value)}
-            className="ml-2 rounded border border-slate-300 px-2 py-1"
+            className="ml-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
           />
         </label>
       </div>
-      <div className="grid gap-6">
+      <div className="grid gap-5">
         <TableroRentabilidad periodo={periodo} />
         <TableroSla periodo={periodo} />
       </div>
