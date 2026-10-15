@@ -26,10 +26,14 @@ async function item(n: number, codigo: string, cant: string, precio: string) {
 
 describe("VentasPage", () => {
   it("lista las ventas con su total", async () => {
-    mockApi([{ path: "/api/v1/ventas", body: [VENTA] }]);
+    mockApi([
+      { path: "/api/v1/ventas", body: [VENTA] },
+      { path: "/api/v1/clientes", body: [{ ruc: VENTA.cliente_ruc, razon_social: "Clínica Demo S.A." }] },
+    ]);
     renderWithProviders(<VentasPage />);
     expect(await screen.findByText("S/ 60.00")).toBeInTheDocument();
-    expect(screen.getByText("20612493821")).toBeInTheDocument();
+    expect(screen.getByText("Clínica Demo S.A.")).toBeInTheDocument();
+    expect(screen.getByText("RUC: 20612493821")).toBeInTheDocument();
   });
 
   it("lista vacía muestra «Sin datos disponibles»", async () => {

@@ -29,12 +29,25 @@ const llamadas = (f: ReturnType<typeof mockApi>, metodo: string) =>
 
 describe("ContratosPage", () => {
   it("TECNICO ve contratos sin acciones de escritura (RN-01)", async () => {
-    mockApi([{ path: "/api/v1/contratos", body: [CONTRATO] }]);
+    mockApi([
+      { path: "/api/v1/contratos", body: [CONTRATO] },
+      { path: "/api/v1/clientes", body: [{ ruc: CONTRATO.cliente_ruc, razon_social: "Clínica Demo S.A." }] },
+    ]);
     renderWithProviders(<ContratosPage />, { rol: "TECNICO" });
-    expect(await screen.findByText("20612493821")).toBeInTheDocument();
+    expect(await screen.findByText("RUC: 20612493821")).toBeInTheDocument();
     for (const n of [/nuevo contrato/i, /editar/i, /anular/i]) {
       expect(screen.queryByRole("button", { name: n })).not.toBeInTheDocument();
     }
+  });
+
+  it("muestra la razón social encima del RUC del contrato", async () => {
+    mockApi([
+      { path: "/api/v1/contratos", body: [CONTRATO] },
+      { path: "/api/v1/clientes", body: [{ ruc: CONTRATO.cliente_ruc, razon_social: "CLÍNICA SÁNCHEZ FERRER S.A." }] },
+    ]);
+    renderWithProviders(<ContratosPage />);
+    expect(await screen.findByText("CLÍNICA SÁNCHEZ FERRER S.A.")).toBeInTheDocument();
+    expect(screen.getByText("RUC: 20612493821")).toBeInTheDocument();
   });
 
   it("muestra vigencia, monto y SLA", async () => {

@@ -45,10 +45,11 @@ describe("TableroSla", () => {
           razon_social: "Clínica Test SAC", tiempo_respuesta_horas: "9.50", sla_horas_max_respuesta: 4,
         }],
       },
-    }]);
+    }, { path: "/api/v1/clientes", body: [{ ruc: "20612493821", razon_social: "Clinica Test SAC" }] }]);
     renderWithProviders(<TableroSla periodo="2026-09" />);
     expect(await screen.findByText("RO-1")).toBeInTheDocument();
     expect(screen.getByText("Clínica Test SAC")).toBeInTheDocument();
+    expect(screen.getByText("RUC: 20612493821")).toBeInTheDocument();
   });
 
   it("error muestra el mensaje de la API", async () => {

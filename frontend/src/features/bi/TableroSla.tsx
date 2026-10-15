@@ -2,8 +2,10 @@ import { useQuery } from "@tanstack/react-query";
 import ReactEChartsCore from "echarts-for-react/lib/core";
 import { apiFetch } from "../../api/client";
 import { DataTable } from "../../components/DataTable";
+import { ClienteIdentidad } from "../../components/ClienteIdentidad";
 import { mensajeDe } from "../../lib/validators";
 import { echarts } from "./echartsSetup";
+import { useClientesLookup } from "../clientes/useClientesLookup";
 
 type OrdenFueraSla = {
   orden_id: string;
@@ -21,6 +23,7 @@ type SlaResp = {
 };
 
 export function TableroSla({ periodo }: { periodo: string }) {
+  const clientes = useClientesLookup();
   const { data, isLoading, error } = useQuery({
     queryKey: ["analytics", "sla", periodo],
     queryFn: () => apiFetch<SlaResp>(`/analytics/sla?periodo=${periodo}`),
@@ -96,7 +99,7 @@ export function TableroSla({ periodo }: { periodo: string }) {
           rowKey={(o) => o.orden_id}
           columns={[
             { header: "Equipo", cell: (o) => o.equipo_serie ?? "—" },
-            { header: "Cliente", cell: (o) => o.razon_social },
+            { header: "Cliente", cell: (o) => <ClienteIdentidad razonSocial={o.razon_social} ruc={clientes.porRazonSocial(o.razon_social)?.ruc} /> },
             { header: "Tiempo de respuesta (h)", cell: (o) => o.tiempo_respuesta_horas },
             { header: "SLA máximo (h)", cell: (o) => o.sla_horas_max_respuesta },
           ]}

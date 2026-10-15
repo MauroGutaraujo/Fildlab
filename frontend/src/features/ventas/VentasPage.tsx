@@ -5,7 +5,9 @@ import { useAuth } from "../../auth/AuthContext";
 import { DataTable } from "../../components/DataTable";
 import { FormField } from "../../components/FormField";
 import { FormPanel } from "../../components/FormPanel";
+import { ClienteIdentidad } from "../../components/ClienteIdentidad";
 import { centavos, errorCantidad, errorCosto, errorRuc, fechaHora, mensajeDe } from "../../lib/validators";
+import { useClientesLookup } from "../clientes/useClientesLookup";
 
 type Venta = {
   id: number;
@@ -24,6 +26,7 @@ export function VentasPage() {
   const puedeEscribir = useAuth().user?.rol === "GERENCIA";
   const qc = useQueryClient();
   const { data = [], isLoading, error } = useQuery({ queryKey: ["ventas"], queryFn: () => apiFetch<Venta[]>("/ventas") });
+  const clientes = useClientesLookup();
 
   const [abierto, setAbierto] = useState(false);
   const [ruc, setRuc] = useState("");
@@ -127,7 +130,7 @@ export function VentasPage() {
         error={mensajeDe(error)}
         columns={[
           { header: "Fecha", cell: (v) => fechaHora(v.fecha) },
-          { header: "Cliente (RUC)", cell: (v) => v.cliente_ruc },
+          { header: "Cliente", cell: (v) => <ClienteIdentidad razonSocial={clientes.porRuc.get(v.cliente_ruc)?.razon_social ?? (clientes.isLoading ? "Cargando cliente…" : undefined)} ruc={v.cliente_ruc} /> },
           { header: "Ítems", cell: (v) => v.items.length },
           { header: "Total", cell: (v) => `S/ ${v.total_soles}` },
         ]}

@@ -5,7 +5,9 @@ import { useAuth } from "../../auth/AuthContext";
 import { DataTable } from "../../components/DataTable";
 import { FormField } from "../../components/FormField";
 import { FormPanel } from "../../components/FormPanel";
+import { ClienteIdentidad } from "../../components/ClienteIdentidad";
 import { errorMonto, errorRuc, errorSla, mensajeDe } from "../../lib/validators";
+import { useClientesLookup } from "../clientes/useClientesLookup";
 
 type Contrato = {
   id: number;
@@ -31,6 +33,7 @@ export function ContratosPage() {
   const puedeEscribir = useAuth().user?.rol === "GERENCIA"; // RN-01
   const qc = useQueryClient();
   const { data = [], isLoading, error } = useQuery({ queryKey: ["contratos"], queryFn: () => apiFetch<Contrato[]>("/contratos") });
+  const clientes = useClientesLookup();
 
   const [abierto, setAbierto] = useState(false);
   const [editando, setEditando] = useState<Contrato | null>(null);
@@ -158,7 +161,7 @@ export function ContratosPage() {
           )
         }
         columns={[
-          { header: "Cliente (RUC)", cell: (c) => c.cliente_ruc },
+          { header: "Cliente", cell: (c) => <ClienteIdentidad razonSocial={clientes.porRuc.get(c.cliente_ruc)?.razon_social ?? (clientes.isLoading ? "Cargando cliente…" : undefined)} ruc={c.cliente_ruc} /> },
           { header: "Vigencia", cell: (c) => `${c.fecha_inicio} → ${c.fecha_fin}` },
           { header: "Monto mensual", cell: (c) => `S/ ${c.monto_mensual_soles}` },
           { header: "SLA", cell: (c) => `${c.sla_horas_max_respuesta} h` },
