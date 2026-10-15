@@ -54,7 +54,7 @@ function BadgeConectividad() {
     <span
       role="status"
       aria-label={enLinea ? "En línea" : "Sin conexión"}
-      className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold border ${
+      className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold ${
         enLinea
           ? "bg-emerald-500/15 text-emerald-200 border-emerald-400/30"
           : "bg-amber-500/15 text-amber-200 border-amber-400/30"
@@ -91,8 +91,9 @@ function EquipoPicker({ onElegido }: { onElegido: (equipo: EquipoConContrato) =>
   return (
     <section className="p-4 pb-28">
       <div className="mb-4">
-        <h1 className="text-xl font-bold tracking-tight text-slate-800">Elegir equipo</h1>
-        <p className="text-xs text-slate-500 font-medium">Selecciona el equipo a intervenir para abrir la orden técnica</p>
+        <p className="mb-1 text-xs font-semibold uppercase tracking-[0.14em] text-blue-700">Inicio de turno</p>
+        <h1 className="text-2xl font-bold tracking-tight text-slate-950">Elegir equipo</h1>
+        <p className="mt-1 text-sm text-slate-600">Selecciona el equipo y confirma su contrato para abrir la orden técnica.</p>
       </div>
 
       <div className="relative mb-4">
@@ -105,11 +106,11 @@ function EquipoPicker({ onElegido }: { onElegido: (equipo: EquipoConContrato) =>
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Buscar por serie o código…"
-          className="w-full rounded-2xl border border-slate-200 bg-white pl-10 pr-4 py-3 text-sm shadow-xs focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all"
+          className="w-full rounded-xl border border-slate-300 bg-white py-3.5 pl-10 pr-4 text-base shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
         />
       </div>
 
-      <ul className="space-y-2.5">
+      <ul className="space-y-3">
         {equipos.map((e) => {
           const datos = e.datos as EquipoDatos;
           const habilitado = tieneContrato(datos);
@@ -121,17 +122,17 @@ function EquipoPicker({ onElegido }: { onElegido: (equipo: EquipoConContrato) =>
                 disabled={!habilitado}
                 onClick={() => habilitado && onElegido(datos)}
                 title={habilitado ? undefined : "Este equipo no tiene un contrato asignado"}
-                className="group w-full flex items-center justify-between rounded-2xl border border-slate-200/90 bg-white p-3.5 text-left shadow-xs hover:border-blue-300 hover:shadow-md active:scale-[0.99] disabled:opacity-50 disabled:hover:border-slate-200 disabled:hover:shadow-none transition-all cursor-pointer"
+                className="group flex min-h-20 w-full items-center justify-between rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-blue-300 hover:shadow-md active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-55 disabled:hover:border-slate-200 disabled:hover:shadow-sm"
               >
                 <div className="flex items-center gap-3">
-                  <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl font-bold ${habilitado ? "bg-gradient-to-br from-blue-50 to-sky-100 text-blue-600 border border-blue-200/50" : "bg-slate-100 text-slate-400"}`}>
+                  <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${habilitado ? "border border-blue-100 bg-blue-50 text-blue-800" : "bg-slate-100 text-slate-400"}`}>
                     <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3s6 6.5 6 11a6 6 0 11-12 0c0-4.5 6-11 6-11z" />
                     </svg>
                   </div>
                   <div>
-                    <span className="block font-bold text-slate-800 text-base group-hover:text-blue-600 transition-colors">{e.id}</span>
-                    <span className={`inline-block mt-0.5 text-xs font-medium rounded-full px-2 py-0.5 ${habilitado ? "bg-emerald-50 text-emerald-700 border border-emerald-200/60" : "bg-amber-50 text-amber-700 border border-amber-200/60"}`}>
+                    <span className="block text-base font-bold text-slate-950 transition-colors group-hover:text-blue-800">{e.id}</span>
+                    <span className={`mt-1 inline-block rounded-full border px-2.5 py-1 text-xs font-medium ${habilitado ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-amber-200 bg-amber-50 text-amber-800"}`}>
                       {habilitado ? `Contrato Activo #${datos.contrato_id}` : "Sin contrato asignado"}
                     </span>
                   </div>
@@ -280,15 +281,14 @@ function AppInterna() {
   const tecnicoId = decodeTecnicoId(token) ?? 1;
 
   return (
-    <div className="min-h-screen bg-slate-50/70 flex flex-col justify-between antialiased selection:bg-blue-100 selection:text-blue-900">
-      {/* Cabecera persistente de alta fidelidad con gradiente e iluminación */}
-      <header className="sticky top-0 z-20 flex flex-wrap items-center justify-between gap-2 bg-gradient-to-r from-sky-900 to-indigo-950 px-4 py-3 text-white shadow-md shadow-indigo-950/20 border-b border-white/10 backdrop-blur-md">
+    <div className="flex min-h-screen flex-col justify-between bg-slate-100 antialiased selection:bg-blue-100 selection:text-blue-900">
+      <header className="sticky top-0 z-20 flex flex-wrap items-center justify-between gap-3 border-b border-white/10 bg-slate-950 px-4 py-3 text-white shadow-sm shadow-slate-950/20 sm:px-5">
         <div className="flex items-center gap-2.5">
           {pantalla !== "equipo" ? (
             <button
               type="button"
               onClick={volver}
-              className="flex items-center gap-1.5 rounded-xl bg-white/20 px-3 py-1.5 text-xs font-bold text-white shadow-xs backdrop-blur-xs hover:bg-white/30 active:scale-95 transition-all cursor-pointer border border-white/20"
+              className="flex min-h-10 items-center gap-1.5 rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-sm font-semibold text-white transition hover:bg-white/15 active:scale-95"
               title="Volver a la pantalla anterior"
             >
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -302,26 +302,26 @@ function AppInterna() {
               onClick={() => irA("equipo", null)}
               className="flex items-center gap-2.5 text-left cursor-pointer group"
             >
-              <img src="/logo.png" alt="Fildlab" className="h-8 w-8 rounded-xl shadow-xs border border-white/25 object-contain bg-white/10 group-hover:scale-105 transition-transform" />
+              <img src="/logo.png" alt="Fildlab" className="h-9 w-9 rounded-lg border border-white/20 bg-white p-0.5 object-contain" />
               <div className="leading-tight">
-                <span className="block text-base font-extrabold tracking-tight text-white drop-shadow-xs">Fildlab Campo</span>
-                <span className="block text-[10px] font-medium text-sky-100 tracking-wider uppercase">PWA Offline</span>
+                <span className="block text-base font-bold tracking-tight text-white">Fildlab Campo</span>
+                <span className="block text-[10px] font-medium uppercase tracking-[0.14em] text-sky-200">Servicio técnico</span>
               </div>
             </button>
           )}
 
           {pantalla === "stock" && (
-            <span className="text-xs font-semibold text-white/90 bg-white/15 px-2 py-0.5 rounded-full border border-white/20">Stock</span>
+            <span className="rounded-lg border border-white/15 bg-white/10 px-2.5 py-1.5 text-xs font-semibold text-white/95">Stock</span>
           )}
           {pantalla === "misOrdenes" && (
-            <span className="text-xs font-semibold text-white/90 bg-white/15 px-2 py-0.5 rounded-full border border-white/20">Órdenes</span>
+            <span className="rounded-lg border border-white/15 bg-white/10 px-2.5 py-1.5 text-xs font-semibold text-white/95">Órdenes</span>
           )}
           {pantalla === "orden" && equipo && (
-            <span className="text-xs font-semibold text-white/90 bg-white/15 px-2 py-0.5 rounded-full border border-white/20 truncate max-w-[120px]">{equipo.serie}</span>
+            <span className="max-w-[120px] truncate rounded-lg border border-white/15 bg-white/10 px-2.5 py-1.5 text-xs font-semibold text-white/95">{equipo.serie}</span>
           )}
         </div>
 
-        <nav className="flex items-center gap-2 text-xs font-medium">
+        <nav aria-label="Estado de turno" className="flex items-center gap-2 text-xs font-medium">
           <BadgeConectividad />
           <BotonSincronizar />
           <button
@@ -330,7 +330,7 @@ function AppInterna() {
               await cerrarSesion();
               setToken(null);
             }}
-            className="rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 px-2.5 py-1.5 text-xs font-semibold text-white/90 hover:text-white transition-all cursor-pointer border border-white/10"
+            className="min-h-10 rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-sm font-semibold text-white transition hover:bg-white/15 active:scale-95"
             title="Cerrar turno técnico"
           >
             Salir
@@ -370,13 +370,13 @@ function AppInterna() {
       </main>
 
       {/* Barra de Navegación Inferior Flotante (Glassmorphism Bottom Navigation Bar) */}
-      <nav aria-label="Navegación móvil" className="fixed bottom-3 left-4 right-4 z-30 mx-auto max-w-lg rounded-2xl border border-slate-200/90 bg-white/95 backdrop-blur-md shadow-lg shadow-slate-900/5 py-2 px-3 flex justify-around items-center">
+      <nav aria-label="Navegación móvil" className="fixed bottom-[calc(env(safe-area-inset-bottom)+0.75rem)] left-3 right-3 z-30 mx-auto flex max-w-lg items-center justify-around rounded-2xl border border-slate-200 bg-white/95 px-2 py-2 shadow-xl shadow-slate-900/10 backdrop-blur-md sm:px-3">
         <button
           type="button"
           onClick={() => irA("equipo", null)}
-          className={`flex flex-col items-center gap-1 px-4 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+          className={`flex min-h-14 min-w-16 flex-col items-center justify-center gap-1 rounded-xl px-3 py-1.5 text-xs font-semibold transition ${
             pantalla === "equipo" || pantalla === "orden"
-              ? "bg-blue-50 text-blue-600 shadow-2xs scale-105"
+              ? "bg-blue-50 text-blue-800"
               : "text-slate-500 hover:text-slate-800 hover:bg-slate-50"
           }`}
         >
@@ -389,9 +389,9 @@ function AppInterna() {
         <button
           type="button"
           onClick={() => irA("misOrdenes", null)}
-          className={`flex flex-col items-center gap-1 px-4 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+          className={`flex min-h-14 min-w-16 flex-col items-center justify-center gap-1 rounded-xl px-3 py-1.5 text-xs font-semibold transition ${
             pantalla === "misOrdenes"
-              ? "bg-blue-50 text-blue-600 shadow-2xs scale-105"
+              ? "bg-blue-50 text-blue-800"
               : "text-slate-500 hover:text-slate-800 hover:bg-slate-50"
           }`}
         >
@@ -404,9 +404,9 @@ function AppInterna() {
         <button
           type="button"
           onClick={() => irA("stock", null)}
-          className={`flex flex-col items-center gap-1 px-4 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+          className={`flex min-h-14 min-w-16 flex-col items-center justify-center gap-1 rounded-xl px-3 py-1.5 text-xs font-semibold transition ${
             pantalla === "stock"
-              ? "bg-blue-50 text-blue-600 shadow-2xs scale-105"
+              ? "bg-blue-50 text-blue-800"
               : "text-slate-500 hover:text-slate-800 hover:bg-slate-50"
           }`}
         >
