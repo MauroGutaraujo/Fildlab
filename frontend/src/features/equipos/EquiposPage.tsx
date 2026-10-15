@@ -27,9 +27,9 @@ type NivelAlerta = "VERDE" | "AMARILLO" | "ROJO";
 type PrediccionRul = { equipo_serie: string; dias_vida_util_remanente: number; nivel_alerta: NivelAlerta };
 
 const COLORES_ALERTA: Record<NivelAlerta, string> = {
-  VERDE: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  AMARILLO: "bg-amber-50 text-amber-700 border-amber-200",
-  ROJO: "bg-red-50 text-red-700 border-red-200",
+  VERDE: "bg-emerald-50 text-emerald-800 border-emerald-200",
+  AMARILLO: "bg-amber-50 text-amber-800 border-amber-200",
+  ROJO: "bg-rose-50 text-rose-800 border-rose-200",
 };
 
 function BadgeAlerta({ prediccion }: { prediccion: PrediccionRul | undefined }) {
@@ -190,11 +190,15 @@ export function EquiposPage() {
   }
 
   return (
-    <section>
-      <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Equipos</h1>
+    <section className="space-y-5">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="mb-1 text-xs font-semibold uppercase tracking-[0.16em] text-blue-700">Mantenimiento y vida útil</p>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-950">Equipos</h1>
+          <p className="mt-1 text-sm text-slate-500">Estado preventivo y vida útil remanente por sistema.</p>
+        </div>
         {puedeEscribir && !abierto && (
-          <button type="button" onClick={abrir} className="rounded bg-sky-700 px-4 py-2 text-white">
+          <button type="button" onClick={abrir} className="rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">
             Nuevo equipo
           </button>
         )}
@@ -234,16 +238,16 @@ export function EquiposPage() {
         </FormPanel>
       )}
 
-      <div className="mb-4 rounded-2xl border border-red-200 bg-red-50/60 p-4">
-        <h2 className="text-sm font-bold text-red-800 mb-1">Equipos en riesgo crítico de falla</h2>
+      <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 p-4">
+        <h2 className="mb-1 text-sm font-bold text-rose-900">Equipos en riesgo crítico de falla</h2>
         {predicciones.isLoading ? (
-          <p className="text-sm text-red-700">Cargando…</p>
+          <p className="text-sm text-rose-800">Cargando…</p>
         ) : predicciones.isError ? (
-          <p className="text-sm text-red-700">No se pudieron cargar las predicciones RUL</p>
+          <p className="text-sm text-rose-800">No se pudieron cargar las predicciones RUL</p>
         ) : enRiesgo.length === 0 ? (
-          <p className="text-sm text-red-700">Sin datos disponibles</p>
+          <p className="text-sm text-rose-800">Sin datos disponibles</p>
         ) : (
-          <ul className="text-sm text-red-700 list-disc list-inside">
+          <ul className="list-inside list-disc text-sm text-rose-800">
             {enRiesgo.map((p) => (
               <li key={p.equipo_serie}>{p.equipo_serie} — {p.dias_vida_util_remanente} días restantes</li>
             ))}

@@ -104,14 +104,18 @@ export function InventarioPage() {
 
   return (
     <section className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Inventario · almacén central</h1>
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="mb-1 text-xs font-semibold uppercase tracking-[0.16em] text-blue-700">Repuestos y disponibilidad</p>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-950">Inventario · almacén central</h1>
+          <p className="mt-1 text-sm text-slate-500">Niveles de stock y movimientos recientes.</p>
+        </div>
         {puedeEscribir && panel === null && (
-          <div className="flex gap-2">
-            <button type="button" onClick={() => abrir("repuesto")} className="rounded bg-sky-700 px-4 py-2 text-white">
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={() => abrir("repuesto")} className="rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">
               Nuevo repuesto
             </button>
-            <button type="button" onClick={() => abrir("movimiento")} className="rounded border border-sky-700 px-4 py-2 text-sky-700">
+            <button type="button" onClick={() => abrir("movimiento")} className="rounded-lg border border-blue-200 bg-white px-4 py-2.5 text-sm font-semibold text-blue-800 transition hover:bg-blue-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">
               Registrar movimiento
             </button>
           </div>
@@ -162,7 +166,7 @@ export function InventarioPage() {
       />
 
       <div>
-        <h2 className="mb-2 font-semibold">Movimientos recientes</h2>
+        <h2 className="mb-3 text-lg font-semibold tracking-tight text-slate-900">Movimientos recientes</h2>
         <DataTable
           rows={(movimientos.data ?? []).slice(0, 20)}
           rowKey={(m) => m.id}

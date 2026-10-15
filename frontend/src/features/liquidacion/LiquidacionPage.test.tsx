@@ -25,7 +25,7 @@ describe("LiquidacionPage", () => {
     mockApi([{ path: "/api/v1/ordenes", body: [ORDEN] }]);
     renderWithProviders(<LiquidacionPage />);
     expect(await screen.findByText("RO-1")).toBeInTheDocument();
-    expect(screen.getByText("COMPROMETIDA", { selector: "td" })).toBeInTheDocument();
+    expect(screen.getByText("COMPROMETIDA", { selector: "span" }).closest("td")).toBeInTheDocument();
   });
 
   it("lista vacía muestra «Sin datos disponibles»", async () => {

@@ -27,6 +27,15 @@ type Errores = Partial<Record<"obs" | "codigo" | "delta", string>>;
 
 const DELTA_RE = /^[+-]?[1-9][0-9]*$/;
 
+function EstadoOrden({ estado }: { estado: Orden["estado"] }) {
+  const color = estado === "LIQUIDADA"
+    ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+    : estado === "COMPROMETIDA"
+      ? "border-amber-200 bg-amber-50 text-amber-800"
+      : "border-sky-200 bg-sky-50 text-sky-800";
+  return <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${color}`}>{estado}</span>;
+}
+
 export function LiquidacionPage() {
   const qc = useQueryClient();
   const [estado, setEstado] = useState("");
@@ -98,9 +107,13 @@ export function LiquidacionPage() {
   }
 
   return (
-    <section>
-      <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Liquidación de órdenes</h1>
+    <section className="space-y-5">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="mb-1 text-xs font-semibold uppercase tracking-[0.16em] text-blue-700">Órdenes sincronizadas</p>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-950">Liquidación de órdenes</h1>
+          <p className="mt-1 text-sm text-slate-500">Revisión del acta y cierre administrativo por estado.</p>
+        </div>
         <div className="w-56">
           <SelectField label="Estado" value={estado} onChange={(e) => setEstado(e.target.value)}>
             <option value="">Todas</option>
@@ -125,11 +138,11 @@ export function LiquidacionPage() {
           <FormField label="Código de repuesto (opcional)" value={codigo} onChange={(e) => setCodigo(e.target.value)} error={errores.codigo} />
           <FormField label="Ajuste de cantidad (+ devuelve, − descuenta)" value={delta} onChange={(e) => setDelta(e.target.value)} inputMode="numeric" error={errores.delta} />
 
-          <div className="rounded border border-slate-200 bg-slate-50 p-3 text-sm sm:col-span-2">
-            <h3 className="mb-1 font-medium">Acta firmada (solo lectura)</h3>
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm sm:col-span-2">
+            <h3 className="mb-2 font-semibold text-slate-900">Acta firmada (solo lectura)</h3>
             {acta.isLoading && <p className="text-slate-500">Cargando acta…</p>}
             {actaNoExiste && <p className="text-slate-500">Esta orden está sin acta sincronizada todavía.</p>}
-            {acta.error && !actaNoExiste && <p className="text-red-700">{mensajeDe(acta.error)}</p>}
+            {acta.error && !actaNoExiste && <p className="text-rose-700">{mensajeDe(acta.error)}</p>}
             {acta.data && (
               <dl className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-1">
                 <dt className="text-slate-500">Hash</dt>
@@ -159,7 +172,7 @@ export function LiquidacionPage() {
       )}
 
       {liquidar.error && (
-        <p role="alert" className="mb-3 rounded border border-red-200 bg-red-50 p-3 text-red-800">
+        <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm font-medium text-rose-800">
           {mensajeDe(liquidar.error)}
         </p>
       )}
@@ -189,7 +202,7 @@ export function LiquidacionPage() {
           { header: "Orden", cell: (o) => o.id.slice(0, 8) },
           { header: "Equipo", cell: (o) => o.equipo_serie ?? "—" },
           { header: "Intervención", cell: (o) => o.tipo_intervencion },
-          { header: "Estado", cell: (o) => o.estado },
+          { header: "Estado", cell: (o) => <EstadoOrden estado={o.estado} /> },
           { header: "Sincronizada", cell: (o) => fechaHora(o.fecha_sincronizacion) },
         ]}
       />

@@ -18,6 +18,15 @@ type Contrato = {
 };
 type Errores = Partial<Record<"ruc" | "inicio" | "fin" | "monto" | "sla", string>>;
 
+function EstadoContrato({ estado }: { estado: string }) {
+  const color = estado === "ACTIVO"
+    ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+    : estado === "ANULADO"
+      ? "border-slate-200 bg-slate-100 text-slate-600"
+      : "border-amber-200 bg-amber-50 text-amber-800";
+  return <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${color}`}>{estado}</span>;
+}
+
 export function ContratosPage() {
   const puedeEscribir = useAuth().user?.rol === "GERENCIA"; // RN-01
   const qc = useQueryClient();
@@ -94,11 +103,15 @@ export function ContratosPage() {
   const editable = (c: Contrato) => puedeEscribir && c.estado !== "ANULADO";
 
   return (
-    <section>
-      <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Contratos y SLA</h1>
+    <section className="space-y-5">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="mb-1 text-xs font-semibold uppercase tracking-[0.16em] text-blue-700">Auditoría de servicio</p>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-950">Contratos y SLA</h1>
+          <p className="mt-1 text-sm text-slate-500">Vigencias, compromisos de respuesta y estado contractual.</p>
+        </div>
         {puedeEscribir && !abierto && (
-          <button type="button" onClick={() => abrir(null)} className="rounded bg-sky-700 px-4 py-2 text-white">
+          <button type="button" onClick={() => abrir(null)} className="rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">
             Nuevo contrato
           </button>
         )}
@@ -121,7 +134,7 @@ export function ContratosPage() {
       )}
 
       {anular.error && (
-        <p role="alert" className="mb-3 rounded border border-red-200 bg-red-50 p-3 text-red-800">
+        <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm font-medium text-rose-800">
           {mensajeDe(anular.error)}
         </p>
       )}
@@ -149,7 +162,7 @@ export function ContratosPage() {
           { header: "Vigencia", cell: (c) => `${c.fecha_inicio} → ${c.fecha_fin}` },
           { header: "Monto mensual", cell: (c) => `S/ ${c.monto_mensual_soles}` },
           { header: "SLA", cell: (c) => `${c.sla_horas_max_respuesta} h` },
-          { header: "Estado", cell: (c) => c.estado },
+          { header: "Estado", cell: (c) => <EstadoContrato estado={c.estado} /> },
         ]}
       />
     </section>
