@@ -7,12 +7,12 @@ export function Firma({ onCambio }: { onCambio: (base64: string | null) => void 
   const ref = useRef<SignatureCanvas>(null);
 
   return (
-    <div>
+    <div className="space-y-3">
       <SignatureCanvas
         canvasProps={
           {
             "data-testid": "firma-canvas",
-            className: "w-full rounded border border-slate-300 bg-white",
+            className: "min-h-40 w-full touch-none rounded-xl border border-slate-200 bg-white shadow-inner",
             // width/height explícitos: sin ambos, react-signature-canvas escala el bitmap con
             // window.devicePixelRatio (_resizeCanvas) y el area dibujable vertical real queda
             // recortada a height/ratio — en un Galaxy A14 (DPR~2.6-3) casi toda la firma se pierde.
@@ -34,7 +34,7 @@ export function Firma({ onCambio }: { onCambio: (base64: string | null) => void 
           ref.current?.clear();
           onCambio(null);
         }}
-        className="mt-1 text-sm text-sky-700 hover:underline"
+        className="min-h-11 rounded-lg border border-slate-200 bg-slate-50 px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
       >
         Limpiar firma
       </button>

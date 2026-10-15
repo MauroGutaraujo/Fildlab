@@ -19,22 +19,34 @@ export function MisOrdenes() {
   });
 
   return (
-    <section className="p-4">
-      <h1 className="mb-4 text-lg font-semibold">Mis órdenes</h1>
+    <section className="space-y-4 p-4 pb-28">
+      <header>
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-blue-700">Trabajo de campo</p>
+        <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-950">Mis órdenes</h1>
+        <p className="mt-1 text-sm text-slate-600">Consulta el estado de guardado y sincronización de tus servicios.</p>
+      </header>
       {ordenes.length === 0 ? (
-        <p className="text-slate-500">No hay órdenes registradas en este dispositivo.</p>
+        <div className="rounded-xl border border-dashed border-slate-300 bg-white p-6 text-center">
+          <p className="font-semibold text-slate-800">No hay órdenes registradas</p>
+          <p className="mt-1 text-sm text-slate-500">Las órdenes que completes en este dispositivo aparecerán aquí.</p>
+        </div>
       ) : (
         <ul className="space-y-2">
           {ordenes.map((o) => (
-            <li key={o.id} className="rounded border border-slate-200 p-3">
-              <div className="flex items-center justify-between text-sm">
-                <span className="font-mono">{o.id.slice(0, 8)}</span>
-                <span className={o.estado_sync === "error" ? "font-medium text-red-700" : "text-slate-600"}>
+            <li key={o.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                <span className="font-mono font-semibold text-slate-700">{o.id.slice(0, 8)}</span>
+                <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${
+                  o.estado_sync === "error" ? "border-rose-200 bg-rose-50 text-rose-800"
+                    : o.estado_sync === "sincronizada" ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                      : "border-blue-200 bg-blue-50 text-blue-800"
+                }`}>
                   {ETIQUETA_ESTADO[o.estado_sync] ?? o.estado_sync}
                 </span>
               </div>
-              <p className="text-xs text-slate-500">{o.equipo_serie} · {o.tipo_intervencion}</p>
-              {o.error_detalle && <p className="mt-1 text-sm text-red-700">{o.error_detalle}</p>}
+              <p className="mt-2 text-sm font-medium text-slate-900">Equipo {o.equipo_serie}</p>
+              <p className="mt-0.5 text-xs text-slate-500">Intervención {o.tipo_intervencion}</p>
+              {o.error_detalle && <p className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">{o.error_detalle}</p>}
             </li>
           ))}
         </ul>
