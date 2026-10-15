@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { forwardRef, useImperativeHandle } from "react";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { OrdenForm } from "./OrdenForm";
 import { db } from "../../db/dexie";
@@ -18,6 +18,18 @@ vi.mock("react-signature-canvas", () => ({
 }));
 
 describe("OrdenForm — lecturas de agua", () => {
+  it("agrupa las lecturas de calidad y volumen con etiquetas accesibles", () => {
+    render(<OrdenForm contratoId={1} equipoSerie="RO-1" tecnicoId={2} />);
+    const calidad = screen.getByRole("group", { name: "Calidad del agua" });
+    const volumen = screen.getByRole("group", { name: "Producción y consumo" });
+
+    expect(within(calidad).getByLabelText(/tds entrada/i)).toBeInTheDocument();
+    expect(within(calidad).getByLabelText(/^ph$/i)).toBeInTheDocument();
+    expect(within(calidad).getByLabelText(/conductividad/i)).toBeInTheDocument();
+    expect(within(volumen).getByLabelText(/litros consumidos/i)).toBeInTheDocument();
+    expect(within(volumen).getByLabelText(/litros de agua pura/i)).toBeInTheDocument();
+  });
+
   it("rechaza ph fuera de 0-14", async () => {
     render(<OrdenForm contratoId={1} equipoSerie="RO-1" tecnicoId={2} />);
     const ph = screen.getByLabelText(/^ph/i);
