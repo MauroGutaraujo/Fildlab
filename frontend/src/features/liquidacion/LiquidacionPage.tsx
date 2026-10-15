@@ -128,12 +128,15 @@ export function LiquidacionPage() {
 
       {enAdenda && (
         <FormPanel
-          title={`Nota de corrección · orden ${enAdenda.id.slice(0, 8)}`}
+          title={`Emitir Nota Administrativa de Corrección · orden ${enAdenda.id.slice(0, 8)}`}
           onSubmit={enviar}
           onCancel={() => setEnAdenda(null)}
           saving={adenda.isPending}
           error={mensajeDe(adenda.error)}
         >
+          <p className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900 sm:col-span-2">
+            Ajuste contable sin modificar el acta firmada. La nota conserva el registro original y deja trazabilidad administrativa.
+          </p>
           <FormField label="Observación" value={obs} onChange={(e) => setObs(e.target.value)} error={errores.obs} />
           <FormField label="Código de repuesto (opcional)" value={codigo} onChange={(e) => setCodigo(e.target.value)} error={errores.codigo} />
           <FormField label="Ajuste de cantidad (+ devuelve, − descuenta)" value={delta} onChange={(e) => setDelta(e.target.value)} inputMode="numeric" error={errores.delta} />
@@ -144,18 +147,33 @@ export function LiquidacionPage() {
             {actaNoExiste && <p className="text-slate-500">Esta orden está sin acta sincronizada todavía.</p>}
             {acta.error && !actaNoExiste && <p className="text-rose-700">{mensajeDe(acta.error)}</p>}
             {acta.data && (
-              <dl className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-1">
-                <dt className="text-slate-500">Hash</dt>
-                <dd className="break-all font-mono text-xs">{acta.data.hash_sha256}</dd>
-                <dt className="text-slate-500">Hash anterior</dt>
-                <dd className="break-all font-mono text-xs">{acta.data.previous_hash ?? "— (primera acta del equipo)"}</dd>
-                <dt className="text-slate-500">GPS</dt>
-                <dd>
-                  {acta.data.gps_latitud}, {acta.data.gps_longitud}
-                </dd>
-                <dt className="text-slate-500">Firmada</dt>
-                <dd>{fechaHora(acta.data.creado_en)}</dd>
-              </dl>
+              <div className="space-y-3">
+                <span className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800">
+                  <span aria-hidden="true">🛡️</span> Integridad Verificada (Ley N° 27269)
+                </span>
+                <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
+                  <div className="rounded-lg border border-slate-200 bg-white p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Firma registrada en el acta</p>
+                    {acta.data.firma_base64 && <img className="mt-2 max-h-24 max-w-full rounded border border-slate-200 bg-white p-1" src={acta.data.firma_base64.startsWith("data:") ? acta.data.firma_base64 : `data:image/png;base64,${acta.data.firma_base64}`} alt="Firma registrada en el acta" />}
+                    <p className="mt-1 text-xs text-slate-500">El acta no incluye el nombre del firmante.</p>
+                  </div>
+                  <div className="rounded-lg border border-slate-200 bg-white p-3 text-sm">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Ubicación GPS</p>
+                    <p className="mt-1 font-medium tabular-nums text-slate-800">{Number(acta.data.gps_latitud).toFixed(5)}, {Number(acta.data.gps_longitud).toFixed(5)}</p>
+                    <p className="mt-2 text-xs text-slate-500">Firmada · {fechaHora(acta.data.creado_en)}</p>
+                  </div>
+                </div>
+                <details className="rounded-lg border border-slate-200 bg-white p-3">
+                  <summary className="cursor-pointer text-sm font-medium text-slate-700">Ver detalles técnicos de auditoría</summary>
+                  <dl className="mt-3 grid gap-2 text-xs sm:grid-cols-[auto_1fr]">
+                    <dt className="text-slate-500">Hash SHA-256</dt>
+                    <dd className="break-all font-mono text-slate-700">{acta.data.hash_sha256}</dd>
+                    <dt className="text-slate-500">Hash anterior</dt>
+                    <dd className="break-all font-mono text-slate-700">{acta.data.previous_hash ?? "— (primera acta del equipo)"}</dd>
+                  </dl>
+                  <button type="button" className="mt-2 text-xs font-semibold text-blue-700 hover:underline" onClick={() => void navigator.clipboard?.writeText(acta.data!.hash_sha256)}>Copiar Hash</button>
+                </details>
+              </div>
             )}
           </div>
 
@@ -193,8 +211,14 @@ export function LiquidacionPage() {
                 Liquidar
               </button>
             )}
-            <button type="button" className="text-slate-700 hover:underline" onClick={() => abrirAdenda(o)}>
-              Adenda
+            <button
+              type="button"
+              className="text-slate-700 hover:underline"
+              title="Emitir Nota Administrativa de Corrección (Ajuste contable sin modificar el acta firmada)"
+              aria-label="Emitir Nota Administrativa de Corrección (Ajuste contable sin modificar el acta firmada)"
+              onClick={() => abrirAdenda(o)}
+            >
+              Nota de corrección
             </button>
           </>
         )}

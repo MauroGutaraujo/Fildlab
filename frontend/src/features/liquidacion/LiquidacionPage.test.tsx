@@ -66,7 +66,7 @@ describe("LiquidacionPage", () => {
     renderWithProviders(<LiquidacionPage />);
     await screen.findByText("RO-1");
     expect(screen.queryByRole("button", { name: /^liquidar$/i })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /adenda/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /nota administrativa de corrección/i })).toBeInTheDocument();
   });
 
   it("muestra el error si liquidar falla (409)", async () => {
@@ -87,7 +87,7 @@ describe("LiquidacionPage", () => {
       { method: "POST", path: `/api/v1/ordenes/${ID}/adendas`, status: 201, body: {} },
     ]);
     renderWithProviders(<LiquidacionPage />);
-    await userEvent.click(await screen.findByRole("button", { name: /adenda/i }));
+    await userEvent.click(await screen.findByRole("button", { name: /nota administrativa de corrección/i }));
     await userEvent.type(screen.getByLabelText("Observación"), "Se usaron 3 filtros");
     await userEvent.type(screen.getByLabelText(/código de repuesto/i), "FILT-05");
     await userEvent.type(screen.getByLabelText(/ajuste de cantidad/i), "-1");
@@ -106,7 +106,7 @@ describe("LiquidacionPage", () => {
       { method: "POST", path: `/api/v1/ordenes/${ID}/adendas`, status: 201, body: {} },
     ]);
     renderWithProviders(<LiquidacionPage />);
-    await userEvent.click(await screen.findByRole("button", { name: /adenda/i }));
+    await userEvent.click(await screen.findByRole("button", { name: /nota administrativa de corrección/i }));
     await userEvent.type(screen.getByLabelText("Observación"), "Nota");
     await userEvent.click(screen.getByRole("button", { name: /guardar/i }));
     await vi.waitFor(() => expect(posts(f)).toHaveLength(1));
@@ -125,7 +125,7 @@ describe("LiquidacionPage", () => {
       { path: `/api/v1/ordenes/${ID}/adendas`, body: [] },
     ]);
     renderWithProviders(<LiquidacionPage />);
-    await userEvent.click(await screen.findByRole("button", { name: /adenda/i }));
+    await userEvent.click(await screen.findByRole("button", { name: /nota administrativa de corrección/i }));
     await userEvent.type(screen.getByLabelText("Observación"), obs);
     if (cod) await userEvent.type(screen.getByLabelText(/código de repuesto/i), cod);
     if (delta) await userEvent.type(screen.getByLabelText(/ajuste de cantidad/i), delta);
@@ -153,9 +153,14 @@ describe("LiquidacionPage", () => {
       },
     ]);
     renderWithProviders(<LiquidacionPage />);
-    await userEvent.click(await screen.findByRole("button", { name: /adenda/i }));
-    expect(await screen.findByText(/a{64}/)).toBeInTheDocument();
-    expect(screen.getByText(/-8.1116000/)).toBeInTheDocument();
+    await userEvent.click(await screen.findByRole("button", { name: /nota administrativa de corrección/i }));
+    expect(await screen.findByText(/integridad verificada \(ley n° 27269\)/i)).toBeInTheDocument();
+    expect(screen.getByText(/a{64}/).closest("details")).not.toHaveProperty("open", true);
+    expect(screen.getByRole("img", { name: /firma registrada en el acta/i })).toHaveAttribute("src", "data:image/png;base64,AAAA");
+    expect(screen.getByText(/-8\.11160, -79\.02880/)).toBeInTheDocument();
+    expect(screen.getByText(/emitir nota administrativa de corrección/i)).toBeInTheDocument();
+    await userEvent.click(screen.getByText(/ver detalles técnicos de auditoría/i));
+    expect(screen.getByText(/a{64}/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /editar acta/i })).not.toBeInTheDocument();
   });
 
@@ -166,7 +171,7 @@ describe("LiquidacionPage", () => {
       { path: `/api/v1/ordenes/${ID}/acta`, status: 404, body: { detail: "La orden aún no tiene acta sincronizada" } },
     ]);
     renderWithProviders(<LiquidacionPage />);
-    await userEvent.click(await screen.findByRole("button", { name: /adenda/i }));
+    await userEvent.click(await screen.findByRole("button", { name: /nota administrativa de corrección/i }));
     expect(await screen.findByText(/sin acta sincronizada/i)).toBeInTheDocument();
   });
 
@@ -176,7 +181,7 @@ describe("LiquidacionPage", () => {
       { path: `/api/v1/ordenes/${ID}/adendas`, body: [{ id: 1, orden_id: ID, gerente_id: 1, observacion: "Corrección previa", ajuste_repuestos: null, fecha_adenda: "2026-03-02T10:00:00Z" }] },
     ]);
     renderWithProviders(<LiquidacionPage />);
-    await userEvent.click(await screen.findByRole("button", { name: /adenda/i }));
+    await userEvent.click(await screen.findByRole("button", { name: /nota administrativa de corrección/i }));
     expect(await screen.findByText(/Corrección previa/)).toBeInTheDocument();
   });
 
@@ -187,7 +192,7 @@ describe("LiquidacionPage", () => {
       { method: "POST", path: `/api/v1/ordenes/${ID}/adendas`, status: 409, body: { detail: "FILT-05: stock 2, se piden 5" } },
     ]);
     renderWithProviders(<LiquidacionPage />);
-    await userEvent.click(await screen.findByRole("button", { name: /adenda/i }));
+    await userEvent.click(await screen.findByRole("button", { name: /nota administrativa de corrección/i }));
     await userEvent.type(screen.getByLabelText("Observación"), "x");
     await userEvent.type(screen.getByLabelText(/código de repuesto/i), "FILT-05");
     await userEvent.type(screen.getByLabelText(/ajuste de cantidad/i), "-5");
