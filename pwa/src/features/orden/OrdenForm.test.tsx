@@ -46,6 +46,15 @@ describe("OrdenForm — lecturas de agua", () => {
     expect(await screen.findByText(/no puede ser negativo/i)).toBeInTheDocument();
   });
 
+  it("rechaza una lectura no numérica", async () => {
+    render(<OrdenForm contratoId={1} equipoSerie="RO-1" tecnicoId={2} />);
+    const campo = screen.getByLabelText(/tds.*entrada/i);
+    await userEvent.type(campo, "abc");
+    await userEvent.tab();
+    expect(await screen.findByText(/debe ser un número/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /continuar/i })).toBeDisabled();
+  });
+
   it("el boton de continuar sigue deshabilitado con lecturas incompletas", () => {
     render(<OrdenForm contratoId={1} equipoSerie="RO-1" tecnicoId={2} />);
     expect(screen.getByRole("button", { name: /continuar/i })).toBeDisabled();
@@ -76,6 +85,18 @@ describe("OrdenForm — lecturas de agua", () => {
     await userEvent.click(screen.getByRole("button", { name: /obtener ubicación/i }));
     await userEvent.click(screen.getByTestId("firma-canvas"));
     expect(await screen.findByRole("button", { name: /cerrar orden/i })).toBeEnabled();
+  });
+
+  it("borrar la firma después de completar lecturas y GPS vuelve a bloquear el cierre", async () => {
+    const getCurrentPosition = vi.fn((ok) => ok({ coords: { latitude: -8.11, longitude: -79.02 } }));
+    vi.stubGlobal("navigator", { geolocation: { getCurrentPosition } });
+    render(<OrdenForm contratoId={1} equipoSerie="RO-1" tecnicoId={2} />);
+    await completarLecturasValidas();
+    await userEvent.click(screen.getByRole("button", { name: /obtener ubicación/i }));
+    await userEvent.click(screen.getByTestId("firma-canvas"));
+    expect(await screen.findByRole("button", { name: /cerrar orden/i })).toBeEnabled();
+    await userEvent.click(screen.getByRole("button", { name: /limpiar firma/i }));
+    expect(screen.getByRole("button", { name: /cerrar orden/i })).toBeDisabled();
   });
 
   it("si falla la escritura en Dexie al cerrar (ej. cuota excedida), se avisa y no navega", async () => {
@@ -138,5 +159,15 @@ describe("OrdenForm — lecturas de agua", () => {
     await userEvent.click(screen.getByRole("button", { name: /agregar repuesto/i }));
     expect(await screen.findByText(/stock móvil insuficiente/i)).toBeInTheDocument();
     expect(screen.queryByText(/FILT-05.*5/)).not.toBeInTheDocument();
+  });
+
+  it("rechaza una cantidad de repuesto inválida sin agregarla", async () => {
+    render(<OrdenForm contratoId={1} equipoSerie="RO-1" tecnicoId={2} />);
+    await completarLecturasValidas();
+    await userEvent.type(screen.getByLabelText(/código de repuesto/i), "FILT-05");
+    await userEvent.type(screen.getByLabelText(/cantidad consumida/i), "0");
+    await userEvent.click(screen.getByRole("button", { name: /agregar repuesto/i }));
+    expect(await screen.findByText(/cantidad válida/i)).toBeInTheDocument();
+    expect(screen.queryByText(/FILT-05.*0/)).not.toBeInTheDocument();
   });
 });
