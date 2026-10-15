@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fireEvent, screen } from "@testing-library/react";
+import { fireEvent, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { EquiposPage } from "./EquiposPage";
 import { mockApi, renderWithProviders } from "../../test/utils";
@@ -62,6 +62,9 @@ describe("EquiposPage", () => {
     expect(await screen.findByText("RO-2026-0001")).toBeInTheDocument();
     expect(screen.getByText("Ósmosis inversa")).toBeInTheDocument();
     expect(screen.queryByText(/tds_entrada_ppm/)).not.toBeInTheDocument();
+    expect(screen.getByText("TDS: 350 ppm")).toBeInTheDocument();
+    expect(screen.getByText("TDS post: 8 ppm")).toBeInTheDocument();
+    expect(screen.getByText("pH: 7")).toBeInTheDocument();
   });
 
   it("el detalle de parámetros nominales se ve en un modal, con etiquetas legibles", async () => {
@@ -71,12 +74,12 @@ describe("EquiposPage", () => {
     expect(screen.queryByText("TDS entrada (ppm)")).not.toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: /ver detalle/i }));
-    expect(await screen.findByText("TDS entrada (ppm)")).toBeInTheDocument();
-    expect(screen.getByText("350")).toBeInTheDocument();
-    expect(screen.getByText("7")).toBeInTheDocument();
+    const dialog = await screen.findByRole("dialog", { name: /parámetros nominales/i });
+    expect(within(dialog).getByText("TDS entrada: 350 ppm")).toBeInTheDocument();
+    expect(within(dialog).getByText("pH: 7")).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: /cerrar/i }));
-    expect(screen.queryByText("TDS entrada (ppm)")).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   it("TECNICO no ve acciones de escritura", async () => {
@@ -193,9 +196,29 @@ describe("EquiposPage", () => {
       { path: "/api/v1/equipos/predicciones-rul", body: [{ equipo_serie: "RO-2026-0001", dias_vida_util_remanente: 12, nivel_alerta: "ROJO" }] },
     ]);
     renderWithProviders(<EquiposPage />);
-    expect(await screen.findByText(/rojo/i)).toBeInTheDocument();
+    expect(await screen.findByText(/intervención urgente/i)).toBeInTheDocument();
     expect(screen.getByText(/riesgo crítico/i)).toBeInTheDocument();
     expect(screen.getByText(/RO-2026-0001 — 12 días restantes/i)).toBeInTheDocument();
+  });
+
+  it.each([
+    [61, /óptimo/i],
+    [60, /mantenimiento próximo/i],
+    [15, /mantenimiento próximo/i],
+    [14, /intervención urgente/i],
+  ])("clasifica la vida útil remanente de %i días", async (dias, estado) => {
+    mockApi([
+      { path: "/api/v1/equipos", body: [EQUIPO] },
+      { path: "/api/v1/equipos/predicciones-rul", body: [{ equipo_serie: EQUIPO.serie, dias_vida_util_remanente: dias, nivel_alerta: "VERDE" }] },
+    ]);
+    renderWithProviders(<EquiposPage />);
+    expect(await screen.findByText(estado)).toBeInTheDocument();
+  });
+
+  it("etiqueta el filtro como sistema multimedia", async () => {
+    mockApi([{ path: "/api/v1/equipos", body: [{ ...EQUIPO, tipo_sistema: "FILTRO" }] }, SIN_PREDICCIONES]);
+    renderWithProviders(<EquiposPage />);
+    expect(await screen.findByText("Filtro multimedia")).toBeInTheDocument();
   });
 
   it("sin equipos en ROJO no muestra el panel de alertas", async () => {
@@ -204,7 +227,7 @@ describe("EquiposPage", () => {
       { path: "/api/v1/equipos/predicciones-rul", body: [{ equipo_serie: "RO-2026-0001", dias_vida_util_remanente: 200, nivel_alerta: "VERDE" }] },
     ]);
     renderWithProviders(<EquiposPage />);
-    await screen.findByText(/verde/i);
+    await screen.findByText(/óptimo/i);
     expect(screen.getByText(/riesgo crítico/i)).toBeInTheDocument();
     expect(screen.getByText("Sin datos disponibles")).toBeInTheDocument();
   });

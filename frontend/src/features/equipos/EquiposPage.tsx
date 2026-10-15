@@ -10,9 +10,14 @@ import { errorRuc, hoyISO, mensajeDe } from "../../lib/validators";
 const TIPOS = {
   OSMOSIS_INVERSA: "Ósmosis inversa",
   ABLANDADOR: "Ablandador",
-  FILTRO: "Filtro",
+  FILTRO: "Filtro multimedia",
 } as const;
 type Tipo = keyof typeof TIPOS;
+const COLORES_TIPO: Record<Tipo, string> = {
+  OSMOSIS_INVERSA: "border-blue-200 bg-blue-50 text-blue-800",
+  ABLANDADOR: "border-violet-200 bg-violet-50 text-violet-800",
+  FILTRO: "border-cyan-200 bg-cyan-50 text-cyan-800",
+};
 
 type Equipo = {
   serie: string;
@@ -26,11 +31,11 @@ type Equipo = {
 type NivelAlerta = "VERDE" | "AMARILLO" | "ROJO";
 type PrediccionRul = { equipo_serie: string; dias_vida_util_remanente: number; nivel_alerta: NivelAlerta };
 
-const COLORES_ALERTA: Record<NivelAlerta, string> = {
-  VERDE: "bg-emerald-50 text-emerald-800 border-emerald-200",
-  AMARILLO: "bg-amber-50 text-amber-800 border-amber-200",
-  ROJO: "bg-rose-50 text-rose-800 border-rose-200",
-};
+function clasificarRul(dias: number): { label: string; color: string } {
+  if (dias > 60) return { label: "Óptimo", color: "border-emerald-200 bg-emerald-50 text-emerald-800" };
+  if (dias >= 15) return { label: "Mantenimiento próximo", color: "border-amber-200 bg-amber-50 text-amber-900" };
+  return { label: "Intervención urgente", color: "border-rose-200 bg-rose-50 text-rose-800" };
+}
 
 function BadgeAlerta({ prediccion }: { prediccion: PrediccionRul | undefined }) {
   if (!prediccion) {
@@ -40,9 +45,25 @@ function BadgeAlerta({ prediccion }: { prediccion: PrediccionRul | undefined }) 
       </span>
     );
   }
+  const estado = clasificarRul(prediccion.dias_vida_util_remanente);
   return (
-    <span className={`inline-block rounded-full border px-2 py-0.5 text-xs font-semibold ${COLORES_ALERTA[prediccion.nivel_alerta]}`}>
-      {prediccion.nivel_alerta} · {prediccion.dias_vida_util_remanente} días
+    <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold ${estado.color}`}>
+      <span aria-hidden="true" className="h-2 w-2 rounded-full bg-current" />
+      {estado.label} · {prediccion.dias_vida_util_remanente} días
+    </span>
+  );
+}
+
+function formatearParametro(valor: unknown): string {
+  const numero = typeof valor === "number" ? valor : Number(valor);
+  if (valor === null || valor === undefined || String(valor).trim() === "" || !Number.isFinite(numero)) return "—";
+  return new Intl.NumberFormat("es-PE", { maximumFractionDigits: 2 }).format(numero);
+}
+
+function BadgeParametro({ label, valor, unidad = "" }: { label: string; valor: unknown; unidad?: string }) {
+  return (
+    <span className="inline-flex rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-medium text-slate-700">
+      {label}: {formatearParametro(valor)}{unidad ? ` ${unidad}` : ""}
     </span>
   );
 }
@@ -51,6 +72,9 @@ function ModalParametros({ equipo, onCerrar }: { equipo: Equipo; onCerrar: () =>
   const valores = equipo.parametros_nominales;
   return (
     <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="parametros-nominales-titulo"
       className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4"
       onClick={onCerrar}
     >
@@ -59,7 +83,7 @@ function ModalParametros({ equipo, onCerrar }: { equipo: Equipo; onCerrar: () =>
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-base font-bold text-slate-800">Parámetros nominales — {equipo.serie}</h2>
+          <h2 id="parametros-nominales-titulo" className="text-base font-bold text-slate-800">Parámetros nominales — {equipo.serie}</h2>
           <button
             type="button"
             onClick={onCerrar}
@@ -69,14 +93,12 @@ function ModalParametros({ equipo, onCerrar }: { equipo: Equipo; onCerrar: () =>
             Cerrar
           </button>
         </div>
-        <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
-          {PARAMETROS.map((p) => (
-            <div key={p.clave}>
-              <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">{p.label}</dt>
-              <dd className="text-slate-800">{String(valores[p.campo] ?? "—")}</dd>
-            </div>
-          ))}
-        </dl>
+        <div aria-label="Parámetros nominales" className="flex flex-wrap gap-2">
+          {PARAMETROS.map((p) => {
+            const [label, unidad] = p.label.split(" (");
+            return <BadgeParametro key={p.clave} label={label} valor={valores[p.campo]} unidad={unidad?.replace(/\)$/, "")} />;
+          })}
+        </div>
       </div>
     </div>
   );
@@ -120,7 +142,7 @@ export function EquiposPage() {
     queryFn: () => apiFetch<PrediccionRul[]>("/equipos/predicciones-rul"),
   });
   const prediccionPorSerie = new Map((predicciones.data ?? []).map((p) => [p.equipo_serie, p]));
-  const enRiesgo = (predicciones.data ?? []).filter((p) => p.nivel_alerta === "ROJO");
+  const enRiesgo = (predicciones.data ?? []).filter((p) => p.dias_vida_util_remanente < 15);
   const [detalleEquipo, setDetalleEquipo] = useState<Equipo | null>(null);
   const [mantenimientoConfirmado, setMantenimientoConfirmado] = useState<string | null>(null);
   const marcarMantenimiento = useMutation({
@@ -262,19 +284,31 @@ export function EquiposPage() {
         error={mensajeDe(error)}
         columns={[
           { header: "Serie", cell: (e) => e.serie },
-          { header: "Tipo", cell: (e) => TIPOS[e.tipo_sistema] ?? e.tipo_sistema },
+          { header: "Tipo", cell: (e) => (
+            <span className={`inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-xs font-semibold ${COLORES_TIPO[e.tipo_sistema]}`}>
+              <span aria-hidden="true" className="h-2 w-2 rounded-full bg-current" />
+              {TIPOS[e.tipo_sistema] ?? e.tipo_sistema}
+            </span>
+          ) },
           { header: "Cliente (RUC)", cell: (e) => e.cliente_ruc },
           { header: "Instalación", cell: (e) => e.fecha_instalacion },
           {
             header: "Parámetros nominales",
             cell: (e) => (
-              <button
-                type="button"
-                onClick={() => setDetalleEquipo(e)}
-                className="text-xs font-semibold text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
-              >
-                Ver detalle
-              </button>
+              <div className="flex min-w-52 flex-col items-start gap-2">
+                <div className="flex flex-wrap gap-1.5">
+                  <BadgeParametro label="TDS" valor={e.parametros_nominales.tds_entrada_ppm} unidad="ppm" />
+                  <BadgeParametro label="TDS post" valor={e.parametros_nominales.tds_post_membrana_ppm} unidad="ppm" />
+                  <BadgeParametro label="pH" valor={e.parametros_nominales.ph} />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setDetalleEquipo(e)}
+                  className="text-xs font-semibold text-blue-700 hover:text-blue-900 hover:underline cursor-pointer"
+                >
+                  Ver detalle
+                </button>
+              </div>
             ),
           },
           {
