@@ -18,6 +18,22 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 type Panel = null | "repuesto" | "movimiento";
 type Errores = Partial<Record<"codigo" | "descripcion" | "costo" | "repuesto" | "cantidad" | "orden", string>>;
 
+function EstadoStock({ cantidad }: { cantidad: number }) {
+  const estado = cantidad === 0
+    ? { texto: "Agotado", color: "border-rose-200 bg-rose-50 text-rose-800", punto: "bg-rose-500" }
+    : cantidad <= 5
+      ? { texto: "Stock bajo", color: "border-amber-200 bg-amber-50 text-amber-800", punto: "bg-amber-500" }
+      : cantidad > 10
+        ? { texto: "Saludable", color: "border-emerald-200 bg-emerald-50 text-emerald-800", punto: "bg-emerald-500" }
+        : { texto: "Stock limitado", color: "border-slate-200 bg-slate-50 text-slate-700", punto: "bg-slate-400" };
+  return <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold ${estado.color}`}><span aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${estado.punto}`} />{estado.texto}<span className="font-normal">· {cantidad}</span></span>;
+}
+
+function soles(valor: string) {
+  const numero = Number(valor);
+  return `S/. ${Number.isFinite(numero) ? numero.toFixed(2) : "0.00"}`;
+}
+
 export function InventarioPage() {
   const puedeEscribir = useAuth().user?.rol === "GERENCIA";
   const qc = useQueryClient();
@@ -152,21 +168,30 @@ export function InventarioPage() {
         </FormPanel>
       )}
 
-      <DataTable
-        rows={lista}
-        rowKey={(r) => r.codigo}
-        loading={repuestos.isLoading}
-        error={mensajeDe(repuestos.error)}
-        columns={[
-          { header: "Código", cell: (r) => r.codigo },
-          { header: "Descripción", cell: (r) => r.descripcion },
-          { header: "Stock central", cell: (r) => r.stock_almacen_central },
-          { header: "Costo unitario", cell: (r) => `S/ ${r.costo_unitario_soles}` },
-        ]}
-      />
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div className="border-b border-slate-200 bg-slate-50/70 px-4 py-3.5 sm:px-5">
+          <h2 className="text-lg font-semibold tracking-tight text-slate-900">Catálogo de repuestos</h2>
+          <p className="mt-0.5 text-sm text-slate-500">Existencias y costo unitario del almacén central.</p>
+        </div>
+        <DataTable
+          rows={lista}
+          rowKey={(r) => r.codigo}
+          loading={repuestos.isLoading}
+          error={mensajeDe(repuestos.error)}
+          columns={[
+            { header: "Código", cell: (r) => r.codigo },
+            { header: "Descripción", cell: (r) => r.descripcion },
+            { header: "Stock central", cell: (r) => <EstadoStock cantidad={r.stock_almacen_central} /> },
+            { header: "Costo unitario", cell: (r) => <span className="font-medium tabular-nums text-slate-800">{soles(r.costo_unitario_soles)}</span> },
+          ]}
+        />
+      </div>
 
       <div>
-        <h2 className="mb-3 text-lg font-semibold tracking-tight text-slate-900">Movimientos recientes</h2>
+        <div className="mb-3">
+          <h2 className="text-lg font-semibold tracking-tight text-slate-900">Historial de entradas y salidas</h2>
+          <p className="mt-0.5 text-sm text-slate-500">Movimientos recientes del inventario.</p>
+        </div>
         <DataTable
           rows={(movimientos.data ?? []).slice(0, 20)}
           rowKey={(m) => m.id}

@@ -23,9 +23,30 @@ describe("InventarioPage", () => {
     mockApi(base);
     renderWithProviders(<InventarioPage />);
     const fila = (await screen.findByText("Filtro 5 micras")).closest("tr")!;
-    expect(within(fila).getByText("7")).toBeInTheDocument();
-    expect(await screen.findByText("Movimientos recientes")).toBeInTheDocument();
+    expect(within(fila).getByText(/stock limitado/i)).toHaveTextContent("7");
+    expect(await screen.findByRole("heading", { name: /historial de entradas y salidas/i })).toBeInTheDocument();
     expect(await screen.findByText("+10")).toBeInTheDocument();
+  });
+
+  it.each([
+    [0, /agotado/i], [1, /stock bajo/i], [5, /stock bajo/i],
+    [6, /stock limitado/i], [10, /stock limitado/i], [11, /saludable/i],
+  ])("clasifica el stock %i con su semáforo", async (stock, estado) => {
+    mockApi([
+      { path: "/api/v1/repuestos", body: [{ ...REPUESTO, stock_almacen_central: stock }] },
+      { path: "/api/v1/inventario/movimientos", body: [] },
+    ]);
+    renderWithProviders(<InventarioPage />);
+    const fila = (await screen.findByText("Filtro 5 micras")).closest("tr")!;
+    expect(within(fila).getByText(estado)).toBeInTheDocument();
+  });
+
+  it("formatea el costo peruano y separa catálogo del historial", async () => {
+    mockApi(base);
+    renderWithProviders(<InventarioPage />);
+    expect(await screen.findByText("S/. 12.50")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /catálogo de repuestos/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /historial de entradas y salidas/i })).toBeInTheDocument();
   });
 
   it("TECNICO solo lee", async () => {
