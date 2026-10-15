@@ -119,20 +119,28 @@ describe("InventarioPage", () => {
     expect(posts(f)).toHaveLength(0);
   });
 
-  it("salida por orden exige el UUID y lo envía", async () => {
-    const f = mockApi([...base, { method: "POST", path: "/api/v1/inventario/movimientos", status: 201, body: MOV }]);
+  it("salida por orden exige elegir la orden del desplegable y envía su UUID", async () => {
+    const ORDEN_ID = "11111111-1111-1111-1111-111111111111";
+    const f = mockApi([
+      ...base,
+      { path: "/api/v1/ordenes", body: [{ id: ORDEN_ID, contrato_id: 1, fecha_creacion_cliente: "2026-10-15T10:00:00Z" }] },
+      { path: "/api/v1/contratos", body: [{ id: 1, cliente_ruc: "20612493821" }] },
+      { path: "/api/v1/clientes", body: [{ ruc: "20612493821", razon_social: "CLINICA SANCHEZ FERRER" }] },
+      { method: "POST", path: "/api/v1/inventario/movimientos", status: 201, body: MOV },
+    ]);
     renderWithProviders(<InventarioPage />);
     await abrirMovimiento();
     await userEvent.selectOptions(screen.getByLabelText("Repuesto"), "FILT-05");
     await userEvent.selectOptions(screen.getByLabelText("Tipo de movimiento"), "SALIDA_ORDEN");
     await userEvent.type(screen.getByLabelText("Cantidad"), "1");
     await userEvent.click(screen.getByRole("button", { name: /guardar/i }));
-    expect(await screen.findByText(/requieren el uuid/i)).toBeInTheDocument();
+    expect(await screen.findByText(/elegir la orden/i)).toBeInTheDocument();
     expect(posts(f)).toHaveLength(0);
-    await userEvent.type(screen.getByLabelText(/orden \(uuid\)/i), "11111111-1111-1111-1111-111111111111");
+    await screen.findByText(/OT-01CSF151026/);
+    await userEvent.selectOptions(screen.getByLabelText("Orden"), ORDEN_ID);
     await userEvent.click(screen.getByRole("button", { name: /guardar/i }));
     await screen.findByRole("button", { name: /registrar movimiento/i });
-    expect(bodyOf(posts(f)[0]).orden_id).toBe("11111111-1111-1111-1111-111111111111");
+    expect(bodyOf(posts(f)[0]).orden_id).toBe(ORDEN_ID);
   });
 
   it("muestra el 409 de stock insuficiente", async () => {

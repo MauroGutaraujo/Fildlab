@@ -6,14 +6,15 @@ import { DataTable } from "../../components/DataTable";
 import { FormField, SelectField } from "../../components/FormField";
 import { FormPanel } from "../../components/FormPanel";
 import { errorCantidad, errorCosto, fechaHora, mensajeDe } from "../../lib/validators";
+import { formatearOrdenAmigable, razonSocialDeOrden, type ClienteMin, type ContratoMin } from "../../lib/ordenes";
 
 type Repuesto = { codigo: string; descripcion: string; stock_almacen_central: number; costo_unitario_soles: string };
 type Movimiento = { id: number; repuesto_codigo: string; tipo: string; cantidad: number; creado_en: string };
+type OrdenMin = { id: string; contrato_id: number | null; fecha_creacion_cliente: string };
 
 const TIPOS_MOV = ["ENTRADA", "SALIDA_ORDEN", "AJUSTE_ENTRADA", "AJUSTE_SALIDA"] as const;
 type TipoMov = (typeof TIPOS_MOV)[number];
 const SUMAN = new Set(["ENTRADA", "AJUSTE_ENTRADA"]);
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 type Panel = null | "repuesto" | "movimiento";
 type Errores = Partial<Record<"codigo" | "descripcion" | "costo" | "repuesto" | "cantidad" | "orden", string>>;
@@ -39,6 +40,9 @@ export function InventarioPage() {
   const qc = useQueryClient();
   const repuestos = useQuery({ queryKey: ["repuestos"], queryFn: () => apiFetch<Repuesto[]>("/repuestos") });
   const movimientos = useQuery({ queryKey: ["movimientos"], queryFn: () => apiFetch<Movimiento[]>("/inventario/movimientos") });
+  const ordenes = useQuery({ queryKey: ["ordenes"], queryFn: () => apiFetch<OrdenMin[]>("/ordenes") });
+  const contratos = useQuery({ queryKey: ["contratos"], queryFn: () => apiFetch<ContratoMin[]>("/contratos") });
+  const clientes = useQuery({ queryKey: ["clientes"], queryFn: () => apiFetch<ClienteMin[]>("/clientes") });
 
   const [panel, setPanel] = useState<Panel>(null);
   const [codigo, setCodigo] = useState("");
@@ -111,12 +115,19 @@ export function InventarioPage() {
     if (!repuesto) e.repuesto = "Elige un repuesto";
     const c = errorCantidad(cantidad);
     if (c) e.cantidad = c;
-    if (tipo === "SALIDA_ORDEN" && !UUID_RE.test(orden.trim())) e.orden = "Las salidas por orden requieren el UUID de la orden";
+    if (tipo === "SALIDA_ORDEN" && !orden.trim()) e.orden = "Las salidas por orden requieren elegir la orden";
     setErrores(e);
     if (Object.keys(e).length === 0) registrar.mutate();
   }
 
   const lista = repuestos.data ?? [];
+
+  function opcionDeOrden(o: OrdenMin, indice: number): string {
+    const razon = razonSocialDeOrden(o.contrato_id, contratos.data ?? [], clientes.data ?? []);
+    const codigo = formatearOrdenAmigable(o, razon, indice);
+    const fecha = new Date(o.fecha_creacion_cliente).toLocaleDateString("es-PE", { timeZone: "UTC" });
+    return `${codigo} • ${razon ?? "Sin cliente"} (${fecha})`;
+  }
 
   return (
     <section className="space-y-6">
@@ -164,7 +175,16 @@ export function InventarioPage() {
             ))}
           </SelectField>
           <FormField label="Cantidad" value={cantidad} onChange={(e) => setCantidad(e.target.value)} inputMode="numeric" error={errores.cantidad} />
-          {tipo === "SALIDA_ORDEN" && <FormField label="Orden (UUID)" value={orden} onChange={(e) => setOrden(e.target.value)} error={errores.orden} />}
+          {tipo === "SALIDA_ORDEN" && (
+            <SelectField label="Orden" value={orden} onChange={(e) => setOrden(e.target.value)} error={errores.orden}>
+              <option value="">Selecciona…</option>
+              {(ordenes.data ?? []).map((o, i) => (
+                <option key={o.id} value={o.id}>
+                  {opcionDeOrden(o, i)}
+                </option>
+              ))}
+            </SelectField>
+          )}
         </FormPanel>
       )}
 

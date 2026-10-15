@@ -5,13 +5,16 @@ import { DataTable } from "../../components/DataTable";
 import { FormField, SelectField } from "../../components/FormField";
 import { FormPanel } from "../../components/FormPanel";
 import { fechaHora, mensajeDe } from "../../lib/validators";
+import { formatearOrdenAmigable, razonSocialDeOrden, type ClienteMin, type ContratoMin } from "../../lib/ordenes";
 
 const ESTADOS = ["SINCRONIZADA", "COMPROMETIDA", "LIQUIDADA"] as const;
 type Orden = {
   id: string;
+  contrato_id: number | null;
   equipo_serie: string | null;
   tipo_intervencion: string;
   estado: (typeof ESTADOS)[number];
+  fecha_creacion_cliente: string;
   fecha_sincronizacion: string;
 };
 type Adenda = { id: number; observacion: string; ajuste_repuestos: { repuesto_codigo: string; delta: number }[] | null; fecha_adenda: string };
@@ -44,6 +47,14 @@ export function LiquidacionPage() {
     queryKey: ["ordenes", estado],
     queryFn: () => apiFetch<Orden[]>(estado ? `/ordenes?estado=${estado}` : "/ordenes"),
   });
+  const contratos = useQuery({ queryKey: ["contratos"], queryFn: () => apiFetch<ContratoMin[]>("/contratos") });
+  const clientes = useQuery({ queryKey: ["clientes"], queryFn: () => apiFetch<ClienteMin[]>("/clientes") });
+
+  function codigoAmigable(o: Orden): string {
+    const razon = razonSocialDeOrden(o.contrato_id, contratos.data ?? [], clientes.data ?? []);
+    const indice = (ordenes.data ?? []).findIndex((x) => x.id === o.id);
+    return formatearOrdenAmigable(o, razon, indice >= 0 ? indice : undefined);
+  }
 
   const [enAdenda, setEnAdenda] = useState<Orden | null>(null);
   const [obs, setObs] = useState("");
@@ -150,7 +161,7 @@ export function LiquidacionPage() {
 
       {enAdenda && (
         <FormPanel
-          title={`Emitir Nota Administrativa de Corrección · orden ${enAdenda.id.slice(0, 8)}`}
+          title={`Emitir Nota Administrativa de Corrección · orden ${codigoAmigable(enAdenda)}`}
           onSubmit={enviar}
           onCancel={() => setEnAdenda(null)}
           saving={adenda.isPending}
@@ -251,7 +262,15 @@ export function LiquidacionPage() {
           </>
         )}
         columns={[
-          { header: "Orden", cell: (o) => o.id.slice(0, 8) },
+          {
+            header: "Orden",
+            cell: (o) => (
+              <span title={o.id}>
+                <span className="font-bold text-blue-700">{codigoAmigable(o)}</span>
+                <span className="ml-1.5 font-mono text-xs text-slate-400">{o.id.slice(0, 8)}</span>
+              </span>
+            ),
+          },
           { header: "Equipo", cell: (o) => o.equipo_serie ?? "—" },
           { header: "Intervención", cell: (o) => o.tipo_intervencion },
           { header: "Estado", cell: (o) => <EstadoOrden estado={o.estado} /> },

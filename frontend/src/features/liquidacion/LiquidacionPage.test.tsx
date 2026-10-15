@@ -28,6 +28,17 @@ describe("LiquidacionPage", () => {
     expect(screen.getByText("COMPROMETIDA", { selector: "span" }).closest("td")).toBeInTheDocument();
   });
 
+  it("muestra el código amigable de la orden con el cliente real y el UUID como respaldo", async () => {
+    mockApi([
+      { path: "/api/v1/ordenes", body: [ORDEN] },
+      { path: "/api/v1/contratos", body: [{ id: 1, cliente_ruc: "20612493821" }] },
+      { path: "/api/v1/clientes", body: [{ ruc: "20612493821", razon_social: "CLINICA SANCHEZ FERRER" }] },
+    ]);
+    renderWithProviders(<LiquidacionPage />);
+    expect(await screen.findByText("OT-01CSF010326")).toBeInTheDocument();
+    expect(screen.getByText(ID.slice(0, 8))).toBeInTheDocument();
+  });
+
   it("lista vacía muestra «Sin datos disponibles»", async () => {
     mockApi([{ path: "/api/v1/ordenes", body: [] }]);
     renderWithProviders(<LiquidacionPage />);
