@@ -15,7 +15,7 @@ const ICONOS: Record<IconoId, string> = {
 
 function Icono({ id, className }: { id: IconoId; className?: string }) {
   return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={ICONOS[id]} />
     </svg>
   );
@@ -34,95 +34,77 @@ const ENLACES: { to: string; texto: string; icon: IconoId; roles: Rol[] }[] = [
 export function Layout() {
   const { user, logout } = useAuth();
   const location = useLocation();
-
   const seccionActual = ENLACES.find((e) => location.pathname.startsWith(e.to));
 
   return (
-    <div className="min-h-screen bg-slate-50/60 selection:bg-blue-100 selection:text-blue-900 flex flex-col justify-between">
-      <div>
-        <header className="sticky top-0 z-20 flex flex-wrap items-center justify-between gap-4 bg-gradient-to-r from-slate-900 via-blue-950 to-indigo-950 px-5 py-3 text-white shadow-md border-b border-white/10 backdrop-blur-md">
-          <div className="flex flex-wrap items-center gap-6">
+    <div className="min-h-screen bg-slate-100 selection:bg-sky-100 selection:text-sky-950 lg:grid lg:grid-cols-[16rem_minmax(0,1fr)]">
+      <aside
+        aria-label="Navegación administrativa"
+        className="sticky top-0 z-30 border-b border-slate-200 bg-white px-4 py-3 shadow-sm lg:flex lg:h-screen lg:flex-col lg:border-b-0 lg:border-r lg:px-5 lg:py-6 lg:shadow-none"
+      >
+        <NavLink to="/clientes" className="flex w-fit items-center gap-3 rounded-xl focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue-600">
+          <img src="/logo.png" alt="Fildlab" className="h-10 w-10 rounded-xl border border-slate-200 bg-white object-contain p-1" />
+          <span className="leading-tight">
+            <span className="block text-lg font-extrabold tracking-tight text-slate-950">Fildlab</span>
+            <span className="block text-[10px] font-semibold uppercase tracking-[0.16em] text-sky-700">Tratamiento de agua</span>
+          </span>
+        </NavLink>
+
+        <nav aria-label="Principal" className="mt-4 flex gap-1.5 overflow-x-auto pb-1 text-sm lg:mt-10 lg:flex-col lg:overflow-visible">
+          <p className="hidden px-3 pb-2 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400 lg:block">Operación</p>
+          {ENLACES.filter((l) => user && l.roles.includes(user.rol)).map((l) => (
             <NavLink
-              to="/clientes"
-              className="flex items-center gap-2.5 hover:opacity-95 transition-opacity group cursor-pointer"
-              title="Ir al inicio de la plataforma"
+              key={l.to}
+              to={l.to}
+              className={({ isActive }) =>
+                isActive
+                  ? "flex shrink-0 items-center gap-3 rounded-xl bg-blue-50 px-3 py-2.5 font-semibold text-blue-800 ring-1 ring-inset ring-blue-100 lg:w-full"
+                  : "flex shrink-0 items-center gap-3 rounded-xl px-3 py-2.5 font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-950 lg:w-full"
+              }
             >
-              <img
-                src="/logo.png"
-                alt="Fildlab"
-                className="h-9 w-9 rounded-xl shadow-xs border border-white/20 object-contain bg-white/10 group-hover:scale-105 transition-transform"
-              />
-              <div>
-                <span className="text-lg font-extrabold tracking-tight text-white drop-shadow-xs block leading-tight">
-                  Fildlab
-                </span>
-                <span className="text-[10px] font-semibold text-blue-300 tracking-wider uppercase block">
-                  Tratamiento de Agua
-                </span>
-              </div>
+              <Icono id={l.icon} className="h-[18px] w-[18px] shrink-0" />
+              <span>{l.texto}</span>
             </NavLink>
+          ))}
+        </nav>
 
-            <nav aria-label="Principal" className="flex flex-wrap items-center gap-1.5 text-xs font-medium">
-              {ENLACES.filter((l) => user && l.roles.includes(user.rol)).map((l) => (
-                <NavLink
-                  key={l.to}
-                  to={l.to}
-                  className={({ isActive }) =>
-                    isActive
-                      ? "flex items-center gap-1.5 rounded-xl bg-blue-600 px-3 py-1.5 font-bold text-white shadow-xs shadow-blue-500/30 transition-all scale-102"
-                      : "flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-slate-300 hover:text-white hover:bg-white/10 transition-colors"
-                  }
-                >
-                  <Icono id={l.icon} className="h-3.5 w-3.5" />
-                  <span>{l.texto}</span>
-                </NavLink>
-              ))}
-            </nav>
+        <div className="mt-3 hidden items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 lg:mt-auto lg:flex">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-100 text-sm font-bold text-blue-900">
+            {user?.nombre?.charAt(0) || "U"}
           </div>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-slate-900">{user?.nombre}</p>
+            <p className="text-xs text-slate-500">{user?.rol}</p>
+          </div>
+        </div>
+      </aside>
 
-          <div className="flex items-center gap-3 text-xs">
-            <div className="flex items-center gap-2 rounded-xl bg-white/10 border border-white/15 px-3 py-1.5">
-              <div className="h-6 w-6 rounded-full bg-blue-500/30 flex items-center justify-center font-bold text-blue-200 uppercase text-[11px] border border-blue-400/30">
-                {user?.nombre?.charAt(0) || "U"}
-              </div>
-              <span className="font-semibold text-white/95">{user?.nombre}</span>
-              <span className="rounded-full bg-blue-500/20 border border-blue-400/30 px-2 py-0.5 text-[10px] font-bold tracking-wider text-blue-200">
-                {user?.rol}
-              </span>
-            </div>
-
+      <div className="flex min-h-screen min-w-0 flex-col">
+        <header className="flex min-h-16 items-center justify-between gap-4 border-b border-slate-200 bg-white px-4 sm:px-6 lg:px-8">
+          <div className="min-w-0">
+            <p className="text-xs font-medium text-slate-500">Plataforma / {seccionActual?.texto || "Inicio"}</p>
+            <p className="truncate text-sm font-semibold text-slate-900">Fildlab Perú S.A.C. · Trujillo</p>
+          </div>
+          <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+            <span className="hidden text-sm font-medium text-slate-600 sm:inline">{user?.nombre}</span>
             <button
               type="button"
               onClick={logout}
-              className="rounded-xl border border-white/20 bg-white/5 hover:bg-red-500/20 hover:border-red-400/40 px-3 py-1.5 font-semibold text-white/80 hover:text-white transition-all cursor-pointer"
+              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
             >
               Salir
             </button>
           </div>
         </header>
 
-        {/* Barra de migas de pan y contexto del módulo */}
-        <div className="bg-white border-b border-slate-200/80 px-6 py-2.5 shadow-2xs">
-          <div className="mx-auto max-w-6xl flex items-center justify-between text-xs text-slate-500 font-medium">
-            <div className="flex items-center gap-2">
-              <NavLink to="/clientes" className="hover:text-blue-600 transition-colors">
-                Plataforma
-              </NavLink>
-              <span>/</span>
-              <span className="text-slate-800 font-bold">{seccionActual?.texto || "Inicio"}</span>
-            </div>
-            <span className="text-[11px] text-slate-400">Fildlab Perú S.A.C. · Trujillo</span>
-          </div>
-        </div>
-
-        <main className="mx-auto max-w-6xl p-5">
+        <main className="mx-auto w-full max-w-[96rem] flex-1 p-4 sm:p-6 lg:p-8">
           <Outlet />
         </main>
-      </div>
 
-      <footer className="mt-12 border-t border-slate-200 bg-white py-4 px-6 text-center text-xs text-slate-400">
-        <p>Sistema de Gestión Integral de Tratamiento de Agua · Fildlab Perú S.A.C.</p>
-      </footer>
+        <footer className="border-t border-slate-200 bg-white px-6 py-4 text-center text-xs text-slate-500">
+          <p>Sistema de Gestión Integral de Tratamiento de Agua · Fildlab Perú S.A.C.</p>
+        </footer>
+      </div>
     </div>
   );
 }

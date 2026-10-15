@@ -17,7 +17,7 @@ export function DataTable<T>({ columns, rows, rowKey, onEdit, canEdit, actions, 
   const hayAcciones = Boolean(onEdit || actions);
   if (error) {
     return (
-      <div role="alert" className="rounded-2xl border border-red-200 bg-red-50/80 p-4 text-sm font-medium text-red-800 shadow-xs flex items-center gap-2">
+      <div role="alert" className="flex items-center gap-3 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm font-medium text-rose-800">
         <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v3.5m0 3.5h.01M10.29 3.86l-8.09 14A1 1 0 003.09 19h17.82a1 1 0 00.87-1.5l-8.09-14a1 1 0 00-1.74 0z" />
         </svg>
@@ -27,42 +27,42 @@ export function DataTable<T>({ columns, rows, rowKey, onEdit, canEdit, actions, 
   }
   if (loading) {
     return (
-      <div className="flex items-center justify-center p-8 rounded-2xl border border-slate-200 bg-white shadow-xs">
+      <div role="status" aria-live="polite" className="flex items-center justify-center rounded-xl border border-slate-200 bg-white p-8">
         <div className="flex flex-col items-center gap-2.5">
           <div className="h-7 w-7 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
-          <p className="text-xs font-semibold text-slate-400">Cargando registros…</p>
+          <p className="text-sm font-medium text-slate-500">Cargando registros…</p>
         </div>
       </div>
     );
   }
   if (rows.length === 0) {
     return (
-      <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center shadow-xs">
+      <div className="rounded-xl border border-dashed border-slate-300 bg-white p-10 text-center">
         <svg className="h-8 w-8 mx-auto mb-1.5 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 13h6m-6 4h6M9 5h6a2 2 0 012 2v12a2 2 0 01-2 2H9a2 2 0 01-2-2V7a2 2 0 012-2zm3-2v4" />
         </svg>
-        <p className="text-sm font-medium text-slate-500">Sin datos disponibles</p>
+        <p className="text-sm font-medium text-slate-600">Sin datos disponibles</p>
       </div>
     );
   }
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-xs">
+    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
       <div className="overflow-x-auto">
         <table className="min-w-full text-left text-sm">
-          <thead className="bg-slate-50/80 border-b border-slate-200/80 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+          <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-500">
             <tr>
               {columns.map((c) => (
-                <th key={c.header} scope="col" className="px-4 py-3.5">
+                <th key={c.header} scope="col" className="whitespace-nowrap px-4 py-3 text-[11px]">
                   {c.header}
                 </th>
               ))}
-              {hayAcciones && <th scope="col" className="px-4 py-3.5 text-right font-medium">Acciones</th>}
+              {hayAcciones && <th scope="col" className="whitespace-nowrap px-4 py-3 text-right text-[11px] font-medium">Acciones</th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {rows.map((row) => (
-              <tr key={rowKey(row)} className="hover:bg-blue-50/30 transition-colors">
+              <tr key={rowKey(row)} className="transition-colors hover:bg-sky-50/60">
                 {columns.map((c) => (
                   <td key={c.header} className="px-4 py-3.5 text-slate-700">
                     {c.cell(row)}

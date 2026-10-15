@@ -19,6 +19,11 @@ describe("DataTable", () => {
     expect(screen.getByText("Luis")).toBeInTheDocument();
   });
 
+  it("mantiene una envoltura de desplazamiento para tablas anchas", () => {
+    render(<DataTable columns={columns} rows={[{ id: 1, nombre: "Ana" }]} rowKey={(f) => f.id} />);
+    expect(screen.getByRole("table").parentElement).toHaveClass("overflow-x-auto");
+  });
+
   it("sin onEdit no hay acciones de edición", () => {
     render(<DataTable columns={columns} rows={[{ id: 1, nombre: "Ana" }]} rowKey={(f) => f.id} />);
     expect(screen.queryByRole("button", { name: /editar/i })).not.toBeInTheDocument();
