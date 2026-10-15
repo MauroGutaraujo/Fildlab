@@ -60,6 +60,17 @@ describe("TableroSla", () => {
     expect(screen.getByTestId("chart-sla")).toHaveTextContent("#d97706");
   });
 
+  it("distingue una falla al cargar órdenes de un periodo sin tiempos medidos", async () => {
+    mockApi([
+      { path: "/api/v1/analytics/sla?periodo=2026-09", body: { periodo: "2026-09", total_ordenes: 2, ordenes_sin_medicion: 0, ordenes_fuera_sla: [], pct_cumplimiento: 100 } },
+      { path: "/api/v1/ordenes", status: 500, body: { detail: "Error cargando órdenes" } },
+      { path: "/api/v1/contratos", body: [{ id: 1, sla_horas_max_respuesta: 4 }] },
+    ]);
+    renderWithProviders(<TableroSla periodo="2026-09" />);
+    expect(await screen.findByText(/no se pudieron cargar los datos de órdenes para calcular el tiempo promedio/i)).toBeInTheDocument();
+    expect(screen.queryByText(/sin tiempos medidos disponibles/i)).not.toBeInTheDocument();
+  });
+
   it("muestra el aviso de órdenes sin medición junto con el gráfico, cuando hay mediciones parciales", async () => {
     mockApi([{ path: "/api/v1/analytics/sla?periodo=2026-09", body: { periodo: "2026-09", total_ordenes: 4, ordenes_sin_medicion: 2, ordenes_fuera_sla: [], pct_cumplimiento: 100 } }]);
     renderWithProviders(<TableroSla periodo="2026-09" />);

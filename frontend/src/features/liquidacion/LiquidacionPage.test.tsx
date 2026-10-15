@@ -142,8 +142,8 @@ describe("LiquidacionPage", () => {
         path: `/api/v1/ordenes/${ID}/acta`,
         body: {
           orden_id: ID,
-          payload_raw: '{"ph": 7.1}',
-          hash_sha256: "a".repeat(64),
+          payload_raw: "hello",
+          hash_sha256: "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
           previous_hash: null,
           firma_base64: "AAAA",
           gps_latitud: "-8.1116000",
@@ -155,13 +155,28 @@ describe("LiquidacionPage", () => {
     renderWithProviders(<LiquidacionPage />);
     await userEvent.click(await screen.findByRole("button", { name: /nota administrativa de corrección/i }));
     expect(await screen.findByText(/integridad verificada \(ley n° 27269\)/i)).toBeInTheDocument();
-    expect(screen.getByText(/a{64}/).closest("details")).not.toHaveProperty("open", true);
+    expect(screen.getByText("2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824").closest("details")).not.toHaveProperty("open", true);
     expect(screen.getByRole("img", { name: /firma registrada en el acta/i })).toHaveAttribute("src", "data:image/png;base64,AAAA");
     expect(screen.getByText(/-8\.11160, -79\.02880/)).toBeInTheDocument();
     expect(screen.getByText(/emitir nota administrativa de corrección/i)).toBeInTheDocument();
     await userEvent.click(screen.getByText(/ver detalles técnicos de auditoría/i));
-    expect(screen.getByText(/a{64}/)).toBeInTheDocument();
+    expect(screen.getByText("2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /editar acta/i })).not.toBeInTheDocument();
+  });
+
+  it("no declara integridad verificada si el hash no coincide con el payload", async () => {
+    mockApi([
+      { path: "/api/v1/ordenes", body: [ORDEN] },
+      { path: `/api/v1/ordenes/${ID}/adendas`, body: [] },
+      { path: `/api/v1/ordenes/${ID}/acta`, body: {
+        orden_id: ID, payload_raw: "contenido alterado", hash_sha256: "a".repeat(64), previous_hash: null,
+        firma_base64: "AAAA", gps_latitud: "-8.1116000", gps_longitud: "-79.0288000", creado_en: "2026-03-01T10:00:00Z",
+      } },
+    ]);
+    renderWithProviders(<LiquidacionPage />);
+    await userEvent.click(await screen.findByRole("button", { name: /nota administrativa de corrección/i }));
+    expect(await screen.findByText("Integridad no verificada")).toBeInTheDocument();
+    expect(screen.queryByText(/integridad verificada \(ley n° 27269\)/i)).not.toBeInTheDocument();
   });
 
   it("si la orden no tiene acta aún, lo indica sin romper el panel de adenda", async () => {

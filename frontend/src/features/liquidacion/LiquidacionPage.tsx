@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, apiFetch } from "../../api/client";
 import { DataTable } from "../../components/DataTable";
@@ -16,6 +16,7 @@ type Orden = {
 };
 type Adenda = { id: number; observacion: string; ajuste_repuestos: { repuesto_codigo: string; delta: number }[] | null; fecha_adenda: string };
 type Acta = {
+  payload_raw: string;
   hash_sha256: string;
   previous_hash: string | null;
   firma_base64: string;
@@ -63,6 +64,27 @@ export function LiquidacionPage() {
     enabled: enAdenda !== null,
     retry: false,
   });
+  const [integridad, setIntegridad] = useState<"verificada" | "invalida" | "no-disponible" | null>(null);
+  useEffect(() => {
+    if (!acta.data) return;
+    let activa = true;
+    setIntegridad(null);
+    async function verificar() {
+      if (!globalThis.crypto?.subtle) {
+        if (activa) setIntegridad("no-disponible");
+        return;
+      }
+      try {
+        const digest = await globalThis.crypto.subtle.digest("SHA-256", new TextEncoder().encode(acta.data!.payload_raw));
+        const hash = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+        if (activa) setIntegridad(hash === acta.data!.hash_sha256.toLowerCase() ? "verificada" : "invalida");
+      } catch {
+        if (activa) setIntegridad("no-disponible");
+      }
+    }
+    void verificar();
+    return () => { activa = false; };
+  }, [acta.data]);
   const actaNoExiste = acta.error instanceof ApiError && acta.error.status === 404;
 
   const liquidar = useMutation({
@@ -148,9 +170,15 @@ export function LiquidacionPage() {
             {acta.error && !actaNoExiste && <p className="text-rose-700">{mensajeDe(acta.error)}</p>}
             {acta.data && (
               <div className="space-y-3">
-                <span className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800">
-                  <span aria-hidden="true">🛡️</span> Integridad Verificada (Ley N° 27269)
-                </span>
+                {integridad === "verificada" ? (
+                  <span className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800">
+                    <span aria-hidden="true">🛡️</span> Integridad Verificada (Ley N° 27269)
+                  </span>
+                ) : (
+                  <span role={integridad === "invalida" ? "alert" : "status"} className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold ${integridad === "invalida" ? "border-rose-200 bg-rose-50 text-rose-800" : "border-amber-200 bg-amber-50 text-amber-900"}`}>
+                    <span aria-hidden="true">🛡️</span> {integridad === "invalida" ? "Integridad no verificada" : integridad === "no-disponible" ? "No se pudo verificar la integridad" : "Verificando integridad…"}
+                  </span>
+                )}
                 <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
                   <div className="rounded-lg border border-slate-200 bg-white p-3">
                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Firma registrada en el acta</p>
