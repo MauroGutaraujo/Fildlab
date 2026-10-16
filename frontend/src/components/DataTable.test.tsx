@@ -72,3 +72,59 @@ describe("DataTable", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("No se pudo cargar");
   });
 });
+
+describe("DataTable - búsqueda", () => {
+  const filas = [
+    { id: 1, nombre: "Ana" },
+    { id: 2, nombre: "Luis" },
+    { id: 3, nombre: "Carla" },
+  ];
+
+  it("filtra las filas visibles al escribir en el buscador", async () => {
+    render(<DataTable columns={columns} rows={filas} rowKey={(f) => f.id} />);
+    await userEvent.type(screen.getByPlaceholderText("Buscar..."), "lui");
+    expect(screen.getByText("Luis")).toBeInTheDocument();
+    expect(screen.queryByText("Ana")).not.toBeInTheDocument();
+  });
+
+  it("sin coincidencias muestra un aviso con opción de limpiar la búsqueda", async () => {
+    render(<DataTable columns={columns} rows={filas} rowKey={(f) => f.id} />);
+    await userEvent.type(screen.getByPlaceholderText("Buscar..."), "zzz");
+    expect(await screen.findByText("No se encontraron resultados para «zzz»")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Limpiar búsqueda" }));
+    expect(screen.getByText("Ana")).toBeInTheDocument();
+  });
+});
+
+describe("DataTable - paginación", () => {
+  const filas = Array.from({ length: 5 }, (_, i) => ({ id: i + 1, nombre: `Fila ${i + 1}` }));
+
+  it("muestra solo pageSize filas por página", () => {
+    render(<DataTable columns={columns} rows={filas} rowKey={(f) => f.id} pageSize={2} />);
+    expect(screen.getByText("Fila 1")).toBeInTheDocument();
+    expect(screen.getByText("Fila 2")).toBeInTheDocument();
+    expect(screen.queryByText("Fila 3")).not.toBeInTheDocument();
+  });
+
+  it("el botón «Siguiente» avanza de página", async () => {
+    render(<DataTable columns={columns} rows={filas} rowKey={(f) => f.id} pageSize={2} />);
+    await userEvent.click(screen.getByRole("button", { name: /siguiente/i }));
+    expect(screen.getByText("Fila 3")).toBeInTheDocument();
+    expect(screen.queryByText("Fila 1")).not.toBeInTheDocument();
+  });
+
+  it("buscar reinicia la paginación a la página 1", async () => {
+    render(<DataTable columns={columns} rows={filas} rowKey={(f) => f.id} pageSize={2} />);
+    await userEvent.click(screen.getByRole("button", { name: /siguiente/i }));
+    expect(screen.getByText("Fila 3")).toBeInTheDocument();
+    await userEvent.type(screen.getByPlaceholderText("Buscar..."), "Fila 1");
+    expect(screen.getByText("Fila 1")).toBeInTheDocument();
+    expect(screen.queryByText("Fila 3")).not.toBeInTheDocument();
+  });
+
+  it("pageSize=0 desactiva la paginación y muestra todas las filas", () => {
+    render(<DataTable columns={columns} rows={filas} rowKey={(f) => f.id} pageSize={0} />);
+    filas.forEach((f) => expect(screen.getByText(f.nombre)).toBeInTheDocument());
+    expect(screen.queryByRole("button", { name: /siguiente/i })).not.toBeInTheDocument();
+  });
+});
