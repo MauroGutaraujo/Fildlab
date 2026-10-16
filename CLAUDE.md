@@ -244,13 +244,13 @@ CREATE TABLE predicciones_rul (
   - [x] 4.1 Módulo de Business Intelligence (Apache ECharts)
     - [x] 4.1.1 Tablero de rentabilidad financiera por contrato
     - [x] 4.1.2 Tablero de seguimiento y alertas de SLA (< 2%)
-  - [ ] 4.2 Módulo de Inteligencia Artificial (RUL y Supervivencia)
-    - [ ] 4.2.1 Preparación y depuración de historiales técnicos
-    - [ ] 4.2.2 Pipeline de supervivencia (lifelines / Cox PH)
-    - [ ] 4.2.3 Aislamiento batch en GitHub Actions hacia tabla predicciones
-    - [ ] 4.2.4 Visualización de alertas de falla crítica en web
+  - [x] 4.2 Módulo de Inteligencia Artificial (RUL y Supervivencia)
+    - [x] 4.2.1 Preparación y depuración de historiales técnicos
+    - [x] 4.2.2 Pipeline de supervivencia (lifelines / Cox PH)
+    - [x] 4.2.3 Aislamiento batch en GitHub Actions hacia tabla predicciones
+    - [x] 4.2.4 Visualización de alertas de falla crítica en web
   - [ ] 4.3 Verificación de Calidad
-    - [ ] 4.3.1 Pruebas unitarias backend (pytest) y frontend (vitest)
+    - [x] 4.3.1 Pruebas unitarias backend (pytest) y frontend (vitest) e informe funcional
     - [ ] 4.3.2 Evaluación de atributos de calidad ISO/IEC 25010
 
 
