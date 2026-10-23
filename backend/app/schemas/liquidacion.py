@@ -23,6 +23,9 @@ class OrdenOut(BaseModel):
     fecha_creacion_cliente: datetime
     fecha_sincronizacion: datetime
     tiempo_respuesta_horas: Decimal | None
+    fecha_solicitud: datetime | None
+    fecha_primera_atencion: datetime | None
+    sla_horas_max_respuesta: int | None
 
 
 class AjusteRepuesto(BaseModel):
@@ -51,6 +54,7 @@ class ActaOut(BaseModel):
     payload_raw: str
     hash_sha256: str
     previous_hash: str | None
+    secuencia: int | None
     firma_base64: str
     gps_latitud: Decimal
     gps_longitud: Decimal

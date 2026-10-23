@@ -29,3 +29,10 @@ async def test_nivel_alerta_invalido_viola_check_constraint(db, crear_cliente):
     db.add(PrediccionRul(equipo_serie="EQ-TEST-01", dias_vida_util_remanente=10, nivel_alerta="INVENTADO"))
     with pytest.raises(IntegrityError):
         await db.flush()
+
+
+async def test_cifra_nula_con_color_no_es_resultado_valido(db, crear_cliente):
+    await _equipo(db, crear_cliente)
+    db.add(PrediccionRul(equipo_serie="EQ-TEST-01", dias_vida_util_remanente=None, nivel_alerta="VERDE"))
+    with pytest.raises(IntegrityError):
+        await db.flush()

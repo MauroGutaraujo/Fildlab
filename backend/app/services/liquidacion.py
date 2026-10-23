@@ -43,7 +43,7 @@ async def crear_adenda(session: AsyncSession, orden_id: uuid.UUID, gerente_id: i
     await _orden_bloqueada(session, orden_id)
     ajustes = datos.ajuste_repuestos or []
     async with session.begin_nested():
-        for a in ajustes:
+        for a in sorted(ajustes, key=lambda item: item.repuesto_codigo):
             tipo = "AJUSTE_ENTRADA" if a.delta > 0 else "AJUSTE_SALIDA"
             await registrar_movimiento(session, a.repuesto_codigo, tipo, abs(a.delta), gerente_id, orden_id=orden_id)
         adenda = AdendaCorreccion(

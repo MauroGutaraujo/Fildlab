@@ -14,7 +14,7 @@ export class ApiError extends Error {
   }
 }
 
-export type ApiInit = Omit<RequestInit, "body"> & { body?: unknown };
+export type ApiInit = Omit<RequestInit, "body"> & { body?: unknown; token?: string | null };
 
 function mensaje(detail: unknown, fallback: string): string {
   if (typeof detail === "string") return detail;
@@ -30,9 +30,9 @@ function mensaje(detail: unknown, fallback: string): string {
 }
 
 export async function apiFetch<T = unknown>(path: string, init: ApiInit = {}): Promise<T> {
-  const { body, headers: h, ...rest } = init;
+  const { body, headers: h, token: tokenFijado, ...rest } = init;
   const headers = new Headers(h);
-  const token = await obtenerToken();
+  const token = tokenFijado === undefined ? await obtenerToken() : tokenFijado;
   if (token) headers.set("Authorization", `Bearer ${token}`);
   if (body !== undefined) headers.set("Content-Type", "application/json");
 

@@ -4,8 +4,7 @@ from app.core.db import assert_distinct_test_database
 
 
 def test_rechaza_cuando_test_y_produccion_son_la_misma_url():
-    """El fixture de tests hace DROP SCHEMA public CASCADE contra DATABASE_URL_TEST.
-    Si por un copiar-pegar apunta a la misma BD que DATABASE_URL (producción), abortar."""
+    """No autorizar una base de desarrollo/producción como destino de integración."""
     misma = "postgresql://u:p@host/Findlab?sslmode=require"
     with pytest.raises(RuntimeError, match="misma"):
         assert_distinct_test_database(misma, misma)
@@ -20,7 +19,7 @@ def test_rechaza_ignorando_espacios_alrededor():
 def test_acepta_urls_distintas():
     assert_distinct_test_database(
         "postgresql://u:p@prod-host/Findlab?sslmode=require",
-        "postgresql://u:p@test-host/Findlab?sslmode=require",
+        "postgresql://u:p@test-host/Findlab_test?sslmode=require",
     ) is None
 
 

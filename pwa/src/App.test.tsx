@@ -3,22 +3,95 @@ import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { App } from "./App";
 import { db } from "./db/dexie";
+import { tokenDeTecnico } from "./test/token";
+import { guardarSesionTurno } from "./auth/session";
 
 describe("App (PWA)", () => {
+  it("si el formulario bloquea navegación no cambia de pantalla ni cierra sesión", async () => {
+    await guardarSesionTurno(tokenDeTecnico());
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify([]), { status: 200 }));
+    render(<App />);
+    await userEvent.click(await screen.findByRole("button", { name: /stock móvil/i }));
+    await screen.findByRole("heading", { name: /stock móvil/i });
+    const bloquear = (event: Event) => event.preventDefault();
+    window.addEventListener("fildlab:antes-navegar", bloquear);
+    try {
+      await userEvent.click(screen.getByRole("button", { name: /volver/i }));
+      expect(screen.getByRole("heading", { name: /stock móvil/i })).toBeInTheDocument();
+      await userEvent.click(screen.getByRole("button", { name: /mis órdenes/i }));
+      expect(screen.getByRole("heading", { name: /stock móvil/i })).toBeInTheDocument();
+      await userEvent.click(screen.getByRole("button", { name: /salir/i }));
+      expect(await db.sesion.get("actual")).toBeDefined();
+      act(() => window.dispatchEvent(new PopStateEvent("popstate")));
+      expect(screen.getByRole("heading", { name: /stock móvil/i })).toBeInTheDocument();
+    } finally {
+      window.removeEventListener("fildlab:antes-navegar", bloquear);
+    }
+  });
+
+  it("logout y nuevo login reinician navegación", async () => {
+    await guardarSesionTurno(tokenDeTecnico());
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (_input, init) => init?.method === "POST"
+      ? new Response(JSON.stringify({ access_token: tokenDeTecnico(2) }), { status: 200 })
+      : new Response(JSON.stringify([]), { status: 200 }));
+    render(<App />);
+    await userEvent.click(await screen.findByRole("button", { name: /mis órdenes/i }));
+    expect(await screen.findByRole("heading", { name: /mis órdenes/i })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /salir/i }));
+    await userEvent.type(await screen.findByLabelText(/correo técnico/i), "b@fildlab.pe");
+    await userEvent.type(screen.getByLabelText(/contraseña/i), "clave");
+    await userEvent.click(screen.getByRole("button", { name: /ingresar turno/i }));
+    expect(await screen.findByRole("heading", { name: /elegir equipo/i })).toBeInTheDocument();
+    act(() => window.dispatchEvent(new PopStateEvent("popstate")));
+    expect(screen.getByRole("heading", { name: /elegir equipo/i })).toBeInTheDocument();
+  });
+  it("un token malformado muestra ingreso sin inventar técnico 1", async () => {
+    await guardarSesionTurno("token-invalido");
+    render(<App />);
+    expect(await screen.findByRole("heading", { name: /ingreso/i })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /elegir equipo/i })).not.toBeInTheDocument();
+  });
+
+  it("una sesión vencida conserva acceso offline y muestra renovación", async () => {
+    await guardarSesionTurno(tokenDeTecnico(1, 1));
+    vi.spyOn(globalThis, "fetch").mockRejectedValue(new TypeError("sin red"));
+    render(<App />);
+    expect(await screen.findByRole("heading", { name: /elegir equipo/i })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /renovar sesión/i })).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent(/sincronizar/i);
+  });
+
+  it("un 401 pide renovar sesión conservando el acta pendiente", async () => {
+    await guardarSesionTurno(tokenDeTecnico());
+    await db.ordenesLocal.add({
+      id: "requiere-renovar", contrato_id: 1, equipo_serie: "RO-1", tecnico_id: 1,
+      tipo_intervencion: "PREVENTIVO", fecha_creacion_cliente: "2026-01-01T00:00:00Z",
+      lecturas_agua: { tds_entrada_ppm: 1, tds_post_membrana_ppm: 1, tds_producto_final_ppm: 1, ph: 7, conductividad_us_cm: 1, resistividad_mohm_cm: 1, litros_consumidos_red: 1, litros_agua_pura: 1 },
+      firma_base64: "AAAA", gps_latitud: -8, gps_longitud: -79, repuestos_consumidos: [],
+      estado_sync: "pendiente", creado_en_local: "2026-01-01T00:00:00Z", intentos_sync: 0,
+    });
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (_input, init) => (init?.method === "POST")
+      ? new Response(JSON.stringify({ detail: "No autenticado" }), { status: 401 })
+      : new Response(JSON.stringify([]), { status: 200 }));
+    render(<App />);
+    await userEvent.click(await screen.findByRole("button", { name: /sincronizar ahora/i }));
+    expect(await screen.findByRole("button", { name: /renovar sesión/i })).toBeInTheDocument();
+    expect((await db.ordenesLocal.get("requiere-renovar"))?.estado_sync).toBe("pendiente");
+  });
   it("sin sesion muestra el login de turno", async () => {
     render(<App />);
     expect(await screen.findByRole("heading", { name: /ingreso/i })).toBeInTheDocument();
   });
 
   it("con sesion guardada muestra el selector de equipo, no el login", async () => {
-    await db.sesion.put({ id: "actual", token: "tok-ya-logueado", guardado_en: "2026-01-01" });
+    await db.sesion.put({ id: "actual", token: tokenDeTecnico(), guardado_en: "2026-01-01" });
     render(<App />);
     expect(await screen.findByRole("heading", { name: /elegir equipo/i })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: /ingreso/i })).not.toBeInTheDocument();
   });
 
   it("un equipo sin contrato asignado no se puede elegir (evita un contrato_id nulo en la orden)", async () => {
-    await db.sesion.put({ id: "actual", token: "tok-ya-logueado", guardado_en: "2026-01-01" });
+    await db.sesion.put({ id: "actual", token: tokenDeTecnico(), guardado_en: "2026-01-01" });
     await db.catalogoLocal.add({ id: "SIN-CONTRATO", tipo: "equipo", datos: { serie: "SIN-CONTRATO", contrato_id: null }, actualizado_en: "2026-01-01" });
     vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify([]), { status: 200 }));
     render(<App />);
@@ -28,7 +101,7 @@ describe("App (PWA)", () => {
   });
 
   it("la pantalla de stock movil tiene un boton para volver", async () => {
-    await db.sesion.put({ id: "actual", token: "tok-ya-logueado", guardado_en: "2026-01-01" });
+    await db.sesion.put({ id: "actual", token: tokenDeTecnico(), guardado_en: "2026-01-01" });
     vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify([]), { status: 200 }));
     render(<App />);
     await userEvent.click(await screen.findByRole("button", { name: /stock móvil/i }));
@@ -38,7 +111,7 @@ describe("App (PWA)", () => {
   });
 
   it("«Sincronizar ahora» usa TanStack Query (useMutation) para procesar el Outbox", async () => {
-    await db.sesion.put({ id: "actual", token: "tok-ya-logueado", guardado_en: "2026-01-01" });
+    await db.sesion.put({ id: "actual", token: tokenDeTecnico(), guardado_en: "2026-01-01" });
     await db.ordenesLocal.add({
       id: "11111111-1111-1111-1111-111111111111", contrato_id: 1, equipo_serie: "RO-1", tecnico_id: 1,
       tipo_intervencion: "PREVENTIVO", fecha_creacion_cliente: "2026-01-01T00:00:00Z",
@@ -59,7 +132,7 @@ describe("App (PWA)", () => {
   });
 
   it("al entrar en la orden de un equipo permite volver al selector mediante el botón volver", async () => {
-    await db.sesion.put({ id: "actual", token: "tok-ya-logueado", guardado_en: "2026-01-01" });
+    await db.sesion.put({ id: "actual", token: tokenDeTecnico(), guardado_en: "2026-01-01" });
     await db.catalogoLocal.add({ id: "EQ-TEST-01", tipo: "equipo", datos: { serie: "EQ-TEST-01", contrato_id: 10 }, actualizado_en: "2026-01-01" });
     vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify([]), { status: 200 }));
     render(<App />);
@@ -70,7 +143,7 @@ describe("App (PWA)", () => {
   });
 
   it("la barra de navegación inferior permite cambiar a mis órdenes y regresar a equipos", async () => {
-    await db.sesion.put({ id: "actual", token: "tok-ya-logueado", guardado_en: "2026-01-01" });
+    await db.sesion.put({ id: "actual", token: tokenDeTecnico(), guardado_en: "2026-01-01" });
     vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify([]), { status: 200 }));
     render(<App />);
     const nav = await screen.findByRole("navigation", { name: /navegación móvil/i });
@@ -83,7 +156,7 @@ describe("App (PWA)", () => {
   });
 
   it("al saltar a Equipos tras varios pasos, retrocede el historial nativo en vez de acumular otra entrada (evita que el botón atrás se trabe)", async () => {
-    await db.sesion.put({ id: "actual", token: "tok-ya-logueado", guardado_en: "2026-01-01" });
+    await db.sesion.put({ id: "actual", token: tokenDeTecnico(), guardado_en: "2026-01-01" });
     vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify([]), { status: 200 }));
     const goSpy = vi.spyOn(window.history, "go").mockImplementation(() => {});
     const pushSpy = vi.spyOn(window.history, "pushState");
@@ -111,7 +184,7 @@ describe("App (PWA)", () => {
   });
 
   it("resguarda el historial nativo al montar y lo vuelve a armar al llegar a la raíz, para que el botón Atrás nunca cierre la app (solo «Salir» debe hacerlo)", async () => {
-    await db.sesion.put({ id: "actual", token: "tok-ya-logueado", guardado_en: "2026-01-01" });
+    await db.sesion.put({ id: "actual", token: tokenDeTecnico(), guardado_en: "2026-01-01" });
     vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify([]), { status: 200 }));
     const pushSpy = vi.spyOn(window.history, "pushState");
 

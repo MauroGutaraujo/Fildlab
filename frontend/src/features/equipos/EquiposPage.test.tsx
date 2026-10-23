@@ -2,7 +2,12 @@ import { describe, expect, it } from "vitest";
 import { fireEvent, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { EquiposPage } from "./EquiposPage";
-import { mockApi, renderWithProviders } from "../../test/utils";
+import { mockApi as mockApiBase, renderWithProviders } from "../../test/utils";
+
+function mockApi(rutas:Parameters<typeof mockApiBase>[0]) {
+  return mockApiBase([{path:"/api/v1/equipos/supervision-rul",body:{estado:"NORMAL",avisos:[],consultado_en:"2026-10-22T15:00:00Z",
+    ultima_exitosa_en:"2026-10-22T08:00:00Z",total_equipos:1,equipos_sin_evaluar:0,ejecuciones_sin_cierre:0}},...rutas]);
+}
 
 // REQ-03: los 8 parámetros de referencia (TDS entrada/post-membrana/producto final,
 // pH, conductividad, resistividad, litros de red y litros de agua pura).
@@ -27,6 +32,16 @@ const EQUIPO = {
 };
 
 const SIN_PREDICCIONES = { path: "/api/v1/equipos/predicciones-rul", body: [] };
+const PREDICCION = {
+  equipo_serie: EQUIPO.serie, dias_vida_util_remanente: 12, nivel_alerta: "ROJO",
+  actualizado_en: "2026-10-22T15:00:00Z", version_calculo: "COX_INSTALACION_V3", version_dataset: "WEIBULL_CENSURA_V2",
+  fecha_referencia: "2026-01-15", alcance_estimacion: "SISTEMA_DESDE_INSTALACION",
+  motivo_no_estimable: null, estado_estimacion: "ESTIMADA", experimental: true,
+  origen_datos: "SINTETICOS", politica_alerta: "RUL_30_90_V1",
+  vence_en: "2099-01-01T00:00:00Z", ejecucion_id: "run-1", tipo_referencia: "OSMOSIS_INVERSA",
+};
+const CONTRATO = { id: 7, cliente_ruc: EQUIPO.cliente_ruc, estado: "ACTIVO", fecha_inicio: "2026-01-01", fecha_fin: "2026-12-31" };
+const CONTRATOS = { path: `/api/v1/contratos?cliente_ruc=${EQUIPO.cliente_ruc}`, body: [CONTRATO] };
 
 const posts = (f: ReturnType<typeof mockApi>) =>
   f.mock.calls.filter(([, i]) => (i as RequestInit | undefined)?.method === "POST");
@@ -93,8 +108,6 @@ describe("EquiposPage", () => {
   it("lista vacía muestra «Sin datos disponibles»", async () => {
     mockApi([{ path: "/api/v1/equipos", body: [] }, SIN_PREDICCIONES]);
     renderWithProviders(<EquiposPage />);
-    // El panel de riesgo RUL y la tabla de equipos comparten el mismo texto de vacío
-    // (REQ-16) cuando ambos estan vacios a la vez — ambas ocurrencias son legitimas.
     const mensajes = await screen.findAllByText("Sin datos disponibles");
     expect(mensajes.length).toBeGreaterThanOrEqual(1);
   });
@@ -111,16 +124,19 @@ describe("EquiposPage", () => {
     const f = mockApi([
       { path: "/api/v1/equipos", body: [] },
       SIN_PREDICCIONES,
+      CONTRATOS,
       { method: "POST", path: "/api/v1/equipos", status: 201, body: EQUIPO },
     ]);
     renderWithProviders(<EquiposPage />);
     await userEvent.click(await screen.findByRole("button", { name: /nuevo equipo/i }));
     await llenar({ tipo: "ABLANDADOR" });
+    await userEvent.selectOptions(await screen.findByLabelText("Contrato del cliente"), "7");
     await userEvent.click(screen.getByRole("button", { name: /guardar/i }));
     await screen.findByRole("button", { name: /nuevo equipo/i });
     expect(JSON.parse((posts(f)[0][1] as RequestInit).body as string)).toEqual({
       serie: "RO-1",
       cliente_ruc: "20612493821",
+      contrato_id: 7,
       tipo_sistema: "ABLANDADOR",
       fecha_instalacion: "2026-01-15",
       parametros_nominales: PARAMS_REQ03,
@@ -175,13 +191,106 @@ describe("EquiposPage", () => {
     mockApi([
       { path: "/api/v1/equipos", body: [] },
       SIN_PREDICCIONES,
+      CONTRATOS,
       { method: "POST", path: "/api/v1/equipos", status: 409, body: { detail: "Ya existe un equipo con esa serie" } },
     ]);
     renderWithProviders(<EquiposPage />);
     await userEvent.click(await screen.findByRole("button", { name: /nuevo equipo/i }));
     await llenar();
+    await userEvent.selectOptions(await screen.findByLabelText("Contrato del cliente"), "7");
     await userEvent.click(screen.getByRole("button", { name: /guardar/i }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Ya existe un equipo con esa serie");
+  });
+
+  it("permite asociar un equipo legado sin contrato sin reemplazar sus parámetros", async () => {
+    const f = mockApi([
+      { path: "/api/v1/equipos", body: [EQUIPO] }, SIN_PREDICCIONES, CONTRATOS,
+      { method: "PUT", path: `/api/v1/equipos/${EQUIPO.serie}`, body: { ...EQUIPO, contrato_id: 7 } },
+    ]);
+    renderWithProviders(<EquiposPage />);
+    expect(await screen.findByText("Sin contrato")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /editar contrato/i }));
+    expect(screen.getByLabelText(/RUC del cliente/i)).toBeDisabled();
+    await screen.findByRole("option", { name: /Contrato #7/ });
+    await userEvent.selectOptions(screen.getByLabelText("Contrato del cliente"), "7");
+    await userEvent.click(screen.getByRole("button", { name: /guardar/i }));
+    await screen.findByRole("button", { name: /nuevo equipo/i });
+    const put = f.mock.calls.find(([, init]) => init?.method === "PUT");
+    expect(JSON.parse(put?.[1]?.body as string)).toEqual({ contrato_id: 7 });
+  });
+
+  it("filtra contratos ajenos y anulados y limpia selección al cambiar cliente", async () => {
+    const f = mockApi([
+      { path: "/api/v1/equipos", body: [] }, SIN_PREDICCIONES,
+      { ...CONTRATOS, body: [CONTRATO, { ...CONTRATO, id: 8, estado: "ANULADO" }, { ...CONTRATO, id: 9, cliente_ruc: "20111111111" }] },
+      { path: "/api/v1/contratos?cliente_ruc=20111111111", body: [] },
+    ]);
+    renderWithProviders(<EquiposPage />);
+    await userEvent.click(await screen.findByRole("button", { name: /nuevo equipo/i }));
+    await llenar();
+    await screen.findByRole("option", { name: /Contrato #7/ });
+    const selector = screen.getByLabelText("Contrato del cliente");
+    expect(within(selector).getAllByRole("option")).toHaveLength(2);
+    await userEvent.selectOptions(selector, "7");
+    fireEvent.change(screen.getByLabelText(/RUC del cliente/i), { target: { value: "20111111111" } });
+    expect(selector).toHaveValue("");
+    expect(await screen.findByText(/no hay contratos disponibles/i)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /guardar/i }));
+    expect(posts(f)).toHaveLength(0);
+    expect(await screen.findByText(/selecciona un contrato válido/i)).toBeInTheDocument();
+  });
+
+  it("impide crear sin contrato seleccionado", async () => {
+    const f = mockApi([{ path: "/api/v1/equipos", body: [] }, SIN_PREDICCIONES, CONTRATOS]);
+    renderWithProviders(<EquiposPage />);
+    await userEvent.click(await screen.findByRole("button", { name: /nuevo equipo/i }));
+    await llenar();
+    await screen.findByRole("option", { name: /Contrato #7/ });
+    await userEvent.click(screen.getByRole("button", { name: /guardar/i }));
+    expect(await screen.findByText(/selecciona un contrato válido/i)).toBeInTheDocument();
+    expect(posts(f)).toHaveLength(0);
+  });
+
+  it("muestra errores al cargar contratos y permite reintentar", async () => {
+    const f = mockApi([{ path: "/api/v1/equipos", body: [] }, SIN_PREDICCIONES,
+      { ...CONTRATOS, status: 503, body: { detail: "Servicio no disponible" } },
+    ]);
+    renderWithProviders(<EquiposPage />);
+    await userEvent.click(await screen.findByRole("button", { name: /nuevo equipo/i }));
+    await llenar();
+    expect(await screen.findByText(/no se pudieron cargar los contratos/i)).toBeInTheDocument();
+    expect(screen.getByLabelText("Contrato del cliente")).toBeDisabled();
+    await userEvent.click(screen.getByRole("button", { name: /reintentar contratos/i }));
+    await userEvent.click(screen.getByRole("button", { name: /guardar/i }));
+    expect(posts(f)).toHaveLength(0);
+    expect(f.mock.calls.filter(([url]) => url === CONTRATOS.path).length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("bloquea la asociación mientras se cargan contratos", async () => {
+    const f = mockApi([{ path: "/api/v1/equipos", body: [EQUIPO] }, SIN_PREDICCIONES]);
+    const responder = f.getMockImplementation()!;
+    f.mockImplementation((input, init) => String(input) === CONTRATOS.path
+      ? new Promise<Response>(() => {}) : responder(input, init));
+    renderWithProviders(<EquiposPage />);
+    await userEvent.click(await screen.findByRole("button", { name: /editar contrato/i }));
+    expect(await screen.findByRole("status")).toHaveTextContent("Cargando contratos");
+    expect(screen.getByLabelText("Contrato del cliente")).toBeDisabled();
+    await userEvent.click(screen.getByRole("button", { name: /guardar/i }));
+    expect(f.mock.calls.filter(([, init]) => init?.method === "PUT")).toHaveLength(0);
+  });
+
+  it("conserva el formulario y muestra el rechazo al asociar contrato", async () => {
+    mockApi([{ path: "/api/v1/equipos", body: [EQUIPO] }, SIN_PREDICCIONES, CONTRATOS,
+      { method: "PUT", path: `/api/v1/equipos/${EQUIPO.serie}`, status: 422, body: { detail: "El contrato está anulado" } },
+    ]);
+    renderWithProviders(<EquiposPage />);
+    await userEvent.click(await screen.findByRole("button", { name: /editar contrato/i }));
+    await screen.findByRole("option", { name: /Contrato #7/ });
+    await userEvent.selectOptions(screen.getByLabelText("Contrato del cliente"), "7");
+    await userEvent.click(screen.getByRole("button", { name: /guardar/i }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("El contrato está anulado");
+    expect(screen.getByLabelText("Contrato del cliente")).toHaveValue("7");
+    expect(screen.getByText("Sin contrato")).toBeInTheDocument();
   });
 
   it("equipo sin predicción muestra el badge «Sin evaluar»", async () => {
@@ -193,26 +302,33 @@ describe("EquiposPage", () => {
   it("equipo con predicción ROJO muestra el badge y el panel de alertas", async () => {
     mockApi([
       { path: "/api/v1/equipos", body: [EQUIPO] },
-      { path: "/api/v1/equipos/predicciones-rul", body: [{ equipo_serie: "RO-2026-0001", dias_vida_util_remanente: 12, nivel_alerta: "ROJO" }] },
+      { path: "/api/v1/equipos/predicciones-rul", body: [PREDICCION] },
     ]);
     renderWithProviders(<EquiposPage />);
-    expect(await screen.findByText(/intervención urgente/i)).toBeInTheDocument();
-    expect(screen.getByText(/riesgo crítico/i)).toBeInTheDocument();
-    expect(screen.getByText(/RO-2026-0001 — 12 días restantes/i)).toBeInTheDocument();
+    expect(await screen.findByText(/prioridad experimental alta/i)).toBeInTheDocument();
+    expect(screen.getByText(/RO-2026-0001 — 12 días estimados/i)).toBeInTheDocument();
+    expect(screen.getByText(/estimación experimental basada en datos sintéticos/i)).toBeInTheDocument();
+    expect(screen.getByText(/no certifica la calidad del agua/i)).toBeInTheDocument();
+    expect(screen.getByText(/22\/10\/2026/)).toHaveAttribute("datetime", "2026-10-22T15:00:00Z");
   });
 
   it.each([
-    [61, /óptimo/i],
-    [60, /mantenimiento próximo/i],
-    [15, /mantenimiento próximo/i],
-    [14, /intervención urgente/i],
-  ])("clasifica la vida útil remanente de %i días", async (dias, estado) => {
+    [29, "ROJO", /prioridad experimental alta/i],
+    [30, "AMARILLO", /prioridad experimental media/i],
+    [89, "AMARILLO", /prioridad experimental media/i],
+    [90, "VERDE", /prioridad experimental baja/i],
+    // Pares deliberadamente discordantes: el cliente presenta el nivel del servidor.
+    [75, "VERDE", /prioridad experimental baja/i],
+    [20, "ROJO", /prioridad experimental alta/i],
+  ])("presenta %i días con nivel %s del servidor", async (dias, nivel, estado) => {
     mockApi([
       { path: "/api/v1/equipos", body: [EQUIPO] },
-      { path: "/api/v1/equipos/predicciones-rul", body: [{ equipo_serie: EQUIPO.serie, dias_vida_util_remanente: dias, nivel_alerta: "VERDE" }] },
+      { path: "/api/v1/equipos/predicciones-rul", body: [{ ...PREDICCION, dias_vida_util_remanente: dias, nivel_alerta: nivel }] },
     ]);
     renderWithProviders(<EquiposPage />);
     expect(await screen.findByText(estado)).toBeInTheDocument();
+    const lista = screen.queryByText(new RegExp(`${EQUIPO.serie} — ${dias} días estimados`));
+    expect(lista !== null).toBe(nivel === "ROJO");
   });
 
   it("etiqueta el filtro como sistema multimedia", async () => {
@@ -224,12 +340,25 @@ describe("EquiposPage", () => {
   it("sin equipos en ROJO no muestra el panel de alertas", async () => {
     mockApi([
       { path: "/api/v1/equipos", body: [EQUIPO] },
-      { path: "/api/v1/equipos/predicciones-rul", body: [{ equipo_serie: "RO-2026-0001", dias_vida_util_remanente: 200, nivel_alerta: "VERDE" }] },
+      { path: "/api/v1/equipos/predicciones-rul", body: [{ ...PREDICCION, dias_vida_util_remanente: 200, nivel_alerta: "VERDE" }] },
     ]);
     renderWithProviders(<EquiposPage />);
-    await screen.findByText(/óptimo/i);
-    expect(screen.getByText(/riesgo crítico/i)).toBeInTheDocument();
-    expect(screen.getByText("Sin datos disponibles")).toBeInTheDocument();
+    await screen.findByText(/prioridad experimental baja/i);
+    expect(screen.getByText("Sin estimaciones de prioridad alta")).toBeInTheDocument();
+  });
+
+  it.each([
+    ["REQUIERE_RECALCULO", "REQUIERE_RECALCULO", /recálculo pendiente/i],
+    ["NO_ESTIMABLE", "MODELO_INESTABLE", /ajuste del modelo requiere revisión/i],
+    ["NO_ESTIMABLE", "EDAD_FUERA_SOPORTE", /antigüedad supera/i],
+  ])("muestra %s sin cifra ni prioridad", async (estado, motivo, texto) => {
+    mockApi([{ path: "/api/v1/equipos", body: [EQUIPO] },
+      { path: "/api/v1/equipos/predicciones-rul", body: [{ ...PREDICCION,
+        estado_estimacion: estado, motivo_no_estimable: motivo, dias_vida_util_remanente: null, nivel_alerta: null }] }]);
+    renderWithProviders(<EquiposPage />);
+    expect(await screen.findByText(texto)).toBeInTheDocument();
+    expect(screen.queryByText(/prioridad experimental (alta|media|baja)/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/0 días/)).not.toBeInTheDocument();
   });
 
   it("si falla la consulta de predicciones, el panel avisa el error sin bloquear la tabla", async () => {
@@ -243,24 +372,28 @@ describe("EquiposPage", () => {
     expect(await screen.findByText(/no se pudieron cargar las predicciones/i)).toBeInTheDocument();
   });
 
-  it("GERENCIA puede marcar un equipo como mantenido, y ve la confirmación", async () => {
+  it("GERENCIA abre componentes y mantenimiento sin reiniciar la edad global", async () => {
     const f = mockApi([
       { path: "/api/v1/equipos", body: [EQUIPO] },
       SIN_PREDICCIONES,
-      { method: "POST", path: "/api/v1/equipos/RO-2026-0001/marcar-mantenimiento", body: { ...EQUIPO, fecha_ultima_mantencion: "2026-10-09" } },
+      { path: "/api/v1/equipos/RO-2026-0001/componentes", body: [] },
     ]);
     renderWithProviders(<EquiposPage />);
     await screen.findByText("RO-2026-0001");
-    await userEvent.click(screen.getByRole("button", { name: /marcar mantenimiento/i }));
-    expect(await screen.findByText(/registrado/i)).toBeInTheDocument();
-    const llamadas = f.mock.calls.map(([u, i]) => `${(i as RequestInit | undefined)?.method ?? "GET"} ${String(u)}`);
-    expect(llamadas).toContain("POST /api/v1/equipos/RO-2026-0001/marcar-mantenimiento");
+    await userEvent.click(screen.getByRole("button", { name: /componentes y mantenimiento/i }));
+    expect(await screen.findByRole("dialog", { name: /componentes y mantenimiento/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /agregar componente/i })).toBeInTheDocument();
+    expect(f.mock.calls.filter(([,init])=>init?.method === "POST")).toHaveLength(0);
   });
 
-  it("TECNICO no ve el botón de marcar mantenimiento", async () => {
-    mockApi([{ path: "/api/v1/equipos", body: [EQUIPO] }, SIN_PREDICCIONES]);
+  it("TECNICO consulta componentes sin acciones de escritura", async () => {
+    mockApi([{ path: "/api/v1/equipos", body: [EQUIPO] }, SIN_PREDICCIONES,
+      { path: "/api/v1/equipos/RO-2026-0001/componentes", body: [] }]);
     renderWithProviders(<EquiposPage />, { rol: "TECNICO" });
     await screen.findByText("RO-2026-0001");
     expect(screen.queryByRole("button", { name: /marcar mantenimiento/i })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /componentes y mantenimiento/i }));
+    expect(await screen.findByRole("dialog", { name: /componentes y mantenimiento/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /agregar componente/i })).not.toBeInTheDocument();
   });
 });

@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_vali
 from app.schemas.common import Ruc
 
 Serie = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=50)]
-NoNegativo = Annotated[float, Field(ge=0)]
+NoNegativo = Annotated[float, Field(ge=0, allow_inf_nan=False)]
 Ph = Annotated[float, Field(ge=0, le=14)]
 
 

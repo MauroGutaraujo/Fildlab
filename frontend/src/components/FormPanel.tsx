@@ -5,11 +5,12 @@ type Props = {
   onSubmit: () => void;
   onCancel: () => void;
   saving?: boolean;
+  submitLabel?: string;
   error?: string | null;
   children: ReactNode;
 };
 
-export function FormPanel({ title, onSubmit, onCancel, saving, error, children }: Props) {
+export function FormPanel({ title, onSubmit, onCancel, saving, submitLabel = "Guardar", error, children }: Props) {
   function enviar(e: FormEvent) {
     e.preventDefault();
     if (!saving) onSubmit();
@@ -37,7 +38,7 @@ export function FormPanel({ title, onSubmit, onCancel, saving, error, children }
           disabled={saving}
           className="rounded-lg bg-blue-700 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {saving ? "Guardando…" : "Guardar"}
+          {saving ? "Guardando…" : submitLabel}
         </button>
         <button
           type="button"

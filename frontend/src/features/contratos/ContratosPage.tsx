@@ -132,6 +132,7 @@ export function ContratosPage() {
           <FormField label="Inicio de vigencia" type="date" value={inicio} onChange={(e) => setInicio(e.target.value)} error={errores.inicio} />
           <FormField label="Fin de vigencia" type="date" value={fin} onChange={(e) => setFin(e.target.value)} error={errores.fin} />
           <FormField label="Monto mensual (S/)" value={monto} onChange={(e) => setMonto(e.target.value)} inputMode="decimal" error={errores.monto} />
+          {editando && <p className="text-sm text-slate-600">Las nuevas condiciones se aplican desde el próximo mes. Los informes de meses anteriores conservan las condiciones registradas.</p>}
           <FormField label="SLA máx. respuesta (horas)" value={sla} onChange={(e) => setSla(e.target.value)} inputMode="numeric" error={errores.sla} />
         </FormPanel>
       )}

@@ -25,7 +25,7 @@ export const CAMPOS_LECTURA_ORDEN = Object.keys(CAMPOS_LECTURA) as CampoLectura[
 export function errorLectura(campo: CampoLectura, valor: string): string | null {
   if (valor.trim() === "") return `${CAMPOS_LECTURA[campo]} es obligatorio`;
   const n = Number(valor);
-  if (Number.isNaN(n)) return `${CAMPOS_LECTURA[campo]} debe ser un número`;
+  if (!Number.isFinite(n)) return `${CAMPOS_LECTURA[campo]} debe ser un número finito`;
   if (campo === "ph") {
     return n >= 0 && n <= 14 ? null : "El pH debe estar entre 0 y 14";
   }

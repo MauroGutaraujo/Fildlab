@@ -1,14 +1,18 @@
 import hashlib
 import json
+from decimal import Decimal
+from zoneinfo import ZoneInfo
 
-from sqlalchemy import select
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.contrato import Contrato
 from app.models.equipo import Equipo
 from app.models.orden import ActaInmutable, OrdenServicio
+from app.models.repuesto import MovimientoInventario
 from app.models.usuario import Usuario
 from app.schemas.orden import OrdenSincronizarIn
+from app.services.condiciones import condiciones_en_fecha
 from app.services.inventario import registrar_movimiento
 
 
@@ -28,7 +32,15 @@ class ContratoNoEncontrado(OrdenSyncError):
     pass
 
 
-def payload_raw_canonico(datos: OrdenSincronizarIn) -> str:
+class ContratoInvalido(OrdenSyncError):
+    pass
+
+
+class OrdenIdReutilizado(OrdenSyncError):
+    pass
+
+
+def payload_raw_canonico(datos: OrdenSincronizarIn, *, sla_horas_max_respuesta: int | None = None) -> str:
     """Serializacion deterministica del contenido probatorio del acta (RN-04): mismo contenido
     -> mismo string, sin importar el orden de las claves recibidas (json.dumps con sort_keys).
 
@@ -36,6 +48,53 @@ def payload_raw_canonico(datos: OrdenSincronizarIn) -> str:
     a la BD podria sustituir la firma o mover el GPS sin invalidar el hash, y dos ordenes
     distintas con las mismas lecturas producirian el mismo hash_sha256."""
     cuerpo = {
+        "version": 2,
+        "id": str(datos.id),
+        "contrato_id": datos.contrato_id,
+        "equipo_serie": datos.equipo_serie,
+        "tecnico_id": datos.tecnico_id,
+        "tipo_intervencion": datos.tipo_intervencion,
+        "fecha_creacion_cliente": datos.fecha_creacion_cliente.isoformat(),
+        "fecha_solicitud": datos.fecha_solicitud.isoformat() if datos.fecha_solicitud else None,
+        "fecha_primera_atencion": datos.fecha_primera_atencion.isoformat() if datos.fecha_primera_atencion else None,
+        "sla_horas_max_respuesta": sla_horas_max_respuesta,
+        "lecturas_agua": datos.lecturas_agua.model_dump(),
+        "firma_base64": datos.firma_base64,
+        "gps_latitud": str(datos.gps_latitud),
+        "gps_longitud": str(datos.gps_longitud),
+        "repuestos_consumidos": [item.model_dump() for item in datos.repuestos_consumidos],
+    }
+    return json.dumps(cuerpo, sort_keys=True)
+
+
+def _hash(payload_raw: str) -> str:
+    return hashlib.sha256(payload_raw.encode("utf-8")).hexdigest()
+
+
+async def _reintento_mismo_contenido(
+    session: AsyncSession, existente: OrdenServicio, datos: OrdenSincronizarIn
+) -> bool:
+    """Confirma que un UUID existente representa este mismo envío, incluidos acta y repuestos."""
+    acta = await session.scalar(select(ActaInmutable).where(ActaInmutable.orden_id == existente.id))
+    if acta is None or _hash(acta.payload_raw) != acta.hash_sha256:
+        return False
+    try:
+        guardado = json.loads(acta.payload_raw)
+    except (TypeError, json.JSONDecodeError):
+        return False
+    if not isinstance(guardado, dict):
+        return False
+
+    if guardado.get("version") == 2:
+        esperado = json.loads(payload_raw_canonico(
+            datos, sla_horas_max_respuesta=existente.sla_horas_max_respuesta
+        ))
+        return guardado == esperado
+
+    # Compatibilidad con actas v1: esas actas no incluían fechas SLA ni repuestos.
+    # Se cotejan sus campos probatorios y se completan los datos omitidos con la orden
+    # y los movimientos persistidos, para no aceptar una reutilización distinta.
+    esperado_v1 = {
         "id": str(datos.id),
         "contrato_id": datos.contrato_id,
         "equipo_serie": datos.equipo_serie,
@@ -47,11 +106,30 @@ def payload_raw_canonico(datos: OrdenSincronizarIn) -> str:
         "gps_latitud": str(datos.gps_latitud),
         "gps_longitud": str(datos.gps_longitud),
     }
-    return json.dumps(cuerpo, sort_keys=True)
+    if guardado != esperado_v1 or (
+        existente.contrato_id != datos.contrato_id
+        or existente.equipo_serie != datos.equipo_serie
+        or existente.tecnico_id != datos.tecnico_id
+        or existente.tipo_intervencion != datos.tipo_intervencion
+        or existente.fecha_creacion_cliente != datos.fecha_creacion_cliente
+        or existente.fecha_solicitud != datos.fecha_solicitud
+        or existente.fecha_primera_atencion != datos.fecha_primera_atencion
+    ):
+        return False
 
-
-def _hash(payload_raw: str) -> str:
-    return hashlib.sha256(payload_raw.encode("utf-8")).hexdigest()
+    movimientos = (await session.execute(
+        select(MovimientoInventario.repuesto_codigo, MovimientoInventario.cantidad).where(
+            MovimientoInventario.orden_id == existente.id,
+            MovimientoInventario.tipo == "SALIDA_ORDEN",
+        )
+    )).all()
+    consumido_guardado: dict[str, int] = {}
+    for codigo, cantidad in movimientos:
+        consumido_guardado[codigo] = consumido_guardado.get(codigo, 0) + cantidad
+    consumido_recibido: dict[str, int] = {}
+    for item in datos.repuestos_consumidos:
+        consumido_recibido[item.repuesto_codigo] = consumido_recibido.get(item.repuesto_codigo, 0) + item.cantidad
+    return consumido_guardado == consumido_recibido
 
 
 async def sincronizar_orden(session: AsyncSession, datos: OrdenSincronizarIn, usuario: Usuario) -> OrdenServicio:
@@ -63,18 +141,66 @@ async def sincronizar_orden(session: AsyncSession, datos: OrdenSincronizarIn, us
 
     existente = await session.get(OrdenServicio, datos.id)
     if existente is not None:
+        if usuario.rol != "GERENCIA" and existente.tecnico_id != usuario.id:
+            raise TecnicoNoAutorizado(str(usuario.id))
+        if not await _reintento_mismo_contenido(session, existente, datos):
+            raise OrdenIdReutilizado(f"El UUID {datos.id} ya pertenece a una orden con contenido distinto")
         return existente
 
-    if await session.get(Contrato, datos.contrato_id) is None:
-        raise ContratoNoEncontrado(str(datos.contrato_id))
-    if await session.get(Equipo, datos.equipo_serie) is None:
-        raise EquipoNoEncontrado(datos.equipo_serie)
-
     async with session.begin_nested():
-        # Bloquea la fila del equipo: sin esto, dos sincronizaciones concurrentes del mismo
-        # equipo (dos tecnicos, o el mismo en dos dispositivos) leerian el mismo previous_hash
-        # y bifurcarian la cadena (Review Focus 2 bajo concurrencia real).
-        await session.execute(select(Equipo).where(Equipo.serie == datos.equipo_serie).with_for_update())
+        # El UUID también se serializa cuando dos reintentos declaran equipos distintos.
+        # Una colisión de 64 bits únicamente serializa dos UUID, nunca los confunde.
+        lock_id = int.from_bytes(datos.id.bytes[:8], byteorder="big", signed=True)
+        await session.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": lock_id})
+        existente = await session.get(OrdenServicio, datos.id)
+        if existente is not None:
+            if usuario.rol != "GERENCIA" and existente.tecnico_id != usuario.id:
+                raise TecnicoNoAutorizado(str(usuario.id))
+            if not await _reintento_mismo_contenido(session, existente, datos):
+                raise OrdenIdReutilizado(f"El UUID {datos.id} ya pertenece a una orden con contenido distinto")
+            return existente
+
+        # Contrato → equipo → repuestos ordenados es el orden global de locks.
+        contrato = (await session.execute(select(Contrato).where(Contrato.id == datos.contrato_id)
+                    .with_for_update(read=True).execution_options(populate_existing=True))).scalar_one_or_none()
+        if contrato is None:
+            raise ContratoNoEncontrado(str(datos.contrato_id))
+        equipo = (await session.execute(select(Equipo).where(Equipo.serie == datos.equipo_serie)
+                  .with_for_update().execution_options(populate_existing=True))).scalar_one_or_none()
+        if equipo is None:
+            raise EquipoNoEncontrado(datos.equipo_serie)
+        # Revalidar después de adquirir el lock, nunca confiar en la lectura previa.
+        existente = await session.get(OrdenServicio, datos.id)
+        if existente is not None:
+            if usuario.rol != "GERENCIA" and existente.tecnico_id != usuario.id:
+                raise TecnicoNoAutorizado(str(usuario.id))
+            if not await _reintento_mismo_contenido(session, existente, datos):
+                raise OrdenIdReutilizado(f"El UUID {datos.id} ya pertenece a una orden con contenido distinto")
+            return existente
+        if equipo.contrato_id != contrato.id or equipo.cliente_ruc != contrato.cliente_ruc:
+            raise ContratoInvalido("Asocia el equipo a un contrato de su mismo cliente antes de sincronizar")
+        if contrato.estado == "ANULADO" and (
+            contrato.anulado_en is None or datos.fecha_creacion_cliente >= contrato.anulado_en
+        ):
+            raise ContratoInvalido("El contrato estaba anulado al realizar el servicio")
+        fecha_servicio = datos.fecha_creacion_cliente.astimezone(ZoneInfo("America/Lima")).date()
+        condiciones = await condiciones_en_fecha(session, contrato, fecha_servicio)
+        if condiciones.estado == "ANULADO" or not condiciones.fecha_inicio <= fecha_servicio <= condiciones.fecha_fin:
+            raise ContratoInvalido("El contrato no está vigente en la fecha del servicio (America/Lima)")
+
+        # Legado importado o creado antes de la migración: continuar sin cambiar el acta.
+        # El id registra inserción; creado_en usa inicio de transacción y no es una cabeza fiable.
+        if equipo.ultimo_hash_acta is None and equipo.secuencia_acta == 0:
+            legacy = select(ActaInmutable).join(OrdenServicio, ActaInmutable.orden_id == OrdenServicio.id).where(
+                OrdenServicio.equipo_serie == equipo.serie)
+            equipo.ultimo_hash_acta = (await session.execute(legacy.with_only_columns(ActaInmutable.hash_sha256)
+                                       .order_by(ActaInmutable.id.desc()).limit(1))).scalar_one_or_none()
+            equipo.secuencia_acta = await session.scalar(legacy.with_only_columns(func.count()))
+
+        respuesta = None
+        if datos.fecha_solicitud is not None:
+            segundos = Decimal(str((datos.fecha_primera_atencion - datos.fecha_solicitud).total_seconds()))
+            respuesta = (segundos / Decimal(3600)).quantize(Decimal("0.01"))
 
         orden = OrdenServicio(
             id=datos.id,
@@ -84,34 +210,34 @@ async def sincronizar_orden(session: AsyncSession, datos: OrdenSincronizarIn, us
             tipo_intervencion=datos.tipo_intervencion,
             estado="SINCRONIZADA",
             fecha_creacion_cliente=datos.fecha_creacion_cliente,
+            fecha_solicitud=datos.fecha_solicitud,
+            fecha_primera_atencion=datos.fecha_primera_atencion,
+            tiempo_respuesta_horas=respuesta,
+            sla_horas_max_respuesta=condiciones.sla_horas_max_respuesta,
         )
         session.add(orden)
         await session.flush()
 
-        payload_raw = payload_raw_canonico(datos)
-        previous_hash = (
-            await session.execute(
-                select(ActaInmutable.hash_sha256)
-                .join(OrdenServicio, ActaInmutable.orden_id == OrdenServicio.id)
-                .where(OrdenServicio.equipo_serie == datos.equipo_serie, OrdenServicio.id != orden.id)
-                .order_by(ActaInmutable.creado_en.desc(), ActaInmutable.id.desc())
-                .limit(1)
-            )
-        ).scalar_one_or_none()
+        payload_raw = payload_raw_canonico(datos, sla_horas_max_respuesta=condiciones.sla_horas_max_respuesta)
+        previous_hash = equipo.ultimo_hash_acta
+        equipo.secuencia_acta += 1
+        equipo.ultimo_hash_acta = _hash(payload_raw)
 
         session.add(
             ActaInmutable(
                 orden_id=orden.id,
                 payload_raw=payload_raw,
-                hash_sha256=_hash(payload_raw),
+                hash_sha256=equipo.ultimo_hash_acta,
                 previous_hash=previous_hash,
+                equipo_serie=equipo.serie,
+                secuencia=equipo.secuencia_acta,
                 firma_base64=datos.firma_base64,
                 gps_latitud=datos.gps_latitud,
                 gps_longitud=datos.gps_longitud,
             )
         )
 
-        for item in datos.repuestos_consumidos:
+        for item in sorted(datos.repuestos_consumidos, key=lambda item: item.repuesto_codigo):
             await registrar_movimiento(
                 session, item.repuesto_codigo, "SALIDA_ORDEN", item.cantidad, datos.tecnico_id, orden_id=orden.id
             )

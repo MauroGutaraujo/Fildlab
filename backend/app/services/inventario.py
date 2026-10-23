@@ -48,7 +48,7 @@ async def registrar_movimiento(
         raise MovimientoInvalido("SALIDA_VENTA requiere venta_id")
 
     repuesto = (
-        await session.execute(select(Repuesto).where(Repuesto.codigo == codigo).with_for_update())
+        await session.execute(select(Repuesto).where(Repuesto.codigo == codigo).with_for_update().execution_options(populate_existing=True))
     ).scalar_one_or_none()
     if repuesto is None:
         raise RepuestoNoEncontrado(codigo)
@@ -59,7 +59,8 @@ async def registrar_movimiento(
     repuesto.stock_almacen_central += delta
 
     mov = MovimientoInventario(
-        repuesto_codigo=codigo, tipo=tipo, cantidad=cantidad, orden_id=orden_id, venta_id=venta_id, usuario_id=usuario_id
+        repuesto_codigo=codigo, tipo=tipo, cantidad=cantidad, orden_id=orden_id, venta_id=venta_id, usuario_id=usuario_id,
+        costo_unitario_soles=repuesto.costo_unitario_soles, costo_historico_confirmado=True,
     )
     session.add(mov)
     await session.flush()

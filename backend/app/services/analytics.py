@@ -9,6 +9,8 @@ from app.models.cliente import Cliente
 from app.models.contrato import Contrato
 from app.models.orden import OrdenServicio
 from app.models.repuesto import MovimientoInventario, Repuesto
+from app.models.contrato import CondicionContrato
+from app.services.condiciones import condiciones_en_fecha
 
 LIMA = ZoneInfo("America/Lima")
 
@@ -30,11 +32,6 @@ async def rentabilidad_por_contrato(session: AsyncSession, periodo: str) -> list
         await session.execute(
             select(Contrato, Cliente.razon_social)
             .join(Cliente, Cliente.ruc == Contrato.cliente_ruc)
-            .where(
-                Contrato.fecha_inicio < fin.date(),
-                Contrato.fecha_fin >= inicio.date(),
-                Contrato.estado != "ANULADO",
-            )
             .order_by(Contrato.id)
         )
     ).all()
@@ -46,7 +43,8 @@ async def rentabilidad_por_contrato(session: AsyncSession, periodo: str) -> list
     costos_q = (
         select(
             OrdenServicio.contrato_id,
-            func.sum(MovimientoInventario.cantidad * Repuesto.costo_unitario_soles * signo).label("costo"),
+            func.sum(MovimientoInventario.cantidad * func.coalesce(MovimientoInventario.costo_unitario_soles, Repuesto.costo_unitario_soles) * signo).label("costo"),
+            func.bool_and(MovimientoInventario.costo_historico_confirmado).label("confirmado"),
         )
         .select_from(MovimientoInventario)
         .join(OrdenServicio, OrdenServicio.id == MovimientoInventario.orden_id)
@@ -59,12 +57,15 @@ async def rentabilidad_por_contrato(session: AsyncSession, periodo: str) -> list
         )
         .group_by(OrdenServicio.contrato_id)
     )
-    costos = {contrato_id: costo for contrato_id, costo in (await session.execute(costos_q)).all()}
+    costos = {contrato_id: (costo, confirmado) for contrato_id, costo, confirmado in (await session.execute(costos_q)).all()}
 
     resultado = []
     for contrato, razon_social in contratos:
-        ingreso = contrato.monto_mensual_soles
-        costo = costos.get(contrato.id) or Decimal("0.00")
+        condicion = await condiciones_en_fecha(session, contrato, inicio.date())
+        if condicion.fecha_inicio >= fin.date() or condicion.fecha_fin < inicio.date() or condicion.estado == "ANULADO":
+            continue
+        ingreso = condicion.monto_mensual_soles
+        costo, costo_confirmado = costos.get(contrato.id, (Decimal("0.00"), True))
         margen = ingreso - costo
         margen_pct = float(margen / ingreso * 100) if ingreso > 0 else None
         resultado.append(
@@ -76,6 +77,7 @@ async def rentabilidad_por_contrato(session: AsyncSession, periodo: str) -> list
                 "costo_repuestos_soles": costo,
                 "margen_soles": margen,
                 "margen_pct": margen_pct,
+                "historial_completo": isinstance(condicion, CondicionContrato) and condicion.origen == "REGISTRADO" and bool(costo_confirmado),
             }
         )
     return resultado
@@ -92,9 +94,8 @@ async def cumplimiento_sla(session: AsyncSession, periodo: str) -> dict:
         )
     ).scalar_one()
 
-    # RN-02/REQ-15 todavia no tiene ningun productor de tiempo_respuesta_horas en el sistema (columna
-    # declarada pero nunca escrita). Si lo tratamos como "cumple", el tablero muestra 100% falso. Se
-    # distinguen las ordenes medidas de las que no, y el % de cumplimiento se calcula solo sobre las medidas.
+    # La PWA registra solicitud/primera atención; órdenes antiguas pueden carecer de medición.
+    # El porcentaje usa sólo las medidas y nunca la demora de sincronización.
     medidas = (
         await session.execute(
             select(func.count())
@@ -113,7 +114,7 @@ async def cumplimiento_sla(session: AsyncSession, periodo: str) -> dict:
                 OrdenServicio.id,
                 OrdenServicio.equipo_serie,
                 OrdenServicio.tiempo_respuesta_horas,
-                Contrato.sla_horas_max_respuesta,
+                func.coalesce(OrdenServicio.sla_horas_max_respuesta, Contrato.sla_horas_max_respuesta),
                 Cliente.razon_social,
             )
             .select_from(OrdenServicio)
@@ -122,7 +123,7 @@ async def cumplimiento_sla(session: AsyncSession, periodo: str) -> dict:
             .where(
                 OrdenServicio.fecha_creacion_cliente >= inicio,
                 OrdenServicio.fecha_creacion_cliente < fin,
-                OrdenServicio.tiempo_respuesta_horas > Contrato.sla_horas_max_respuesta,
+                OrdenServicio.tiempo_respuesta_horas > func.coalesce(OrdenServicio.sla_horas_max_respuesta, Contrato.sla_horas_max_respuesta),
             )
             .order_by(OrdenServicio.fecha_creacion_cliente)
         )

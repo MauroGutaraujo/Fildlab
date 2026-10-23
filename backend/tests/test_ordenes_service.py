@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 
 import pytest
 from sqlalchemy import func, select
+from orden_helpers import firma_png
 
 from app.models.orden import ActaInmutable, OrdenServicio
 from app.models.repuesto import MovimientoInventario
@@ -34,8 +35,8 @@ async def escenario(crear_cliente, db):
 
 def _datos(tecnico_id, contrato_id, **over):
     base = dict(id=uuid.uuid4(), contrato_id=contrato_id, equipo_serie="RO-1", tecnico_id=tecnico_id,
-                tipo_intervencion="PREVENTIVO", fecha_creacion_cliente=datetime.now(timezone.utc),
-                lecturas_agua=LECTURAS, firma_base64="AAAA", gps_latitud="-8.1116000",
+                tipo_intervencion="PREVENTIVO", fecha_creacion_cliente=datetime(2026, 10, 21, 15, tzinfo=timezone.utc),
+                lecturas_agua=LECTURAS, firma_base64=firma_png(), gps_latitud="-8.1116000",
                 gps_longitud="-79.0288000", repuestos_consumidos=[])
     base.update(over)
     return OrdenSincronizarIn(**base)
@@ -51,8 +52,8 @@ def test_payload_canonico_es_deterministico_para_el_mismo_contenido():
 def test_payload_canonico_cambia_si_cambia_la_firma():
     """RN-04: la firma es parte de lo que se hashea; si no, se podria sustituir sin invalidar el hash."""
     id_fijo, fecha_fija = uuid.uuid4(), datetime.now(timezone.utc)
-    a = payload_raw_canonico(_datos(1, 1, id=id_fijo, fecha_creacion_cliente=fecha_fija, firma_base64="AAAA"))
-    b = payload_raw_canonico(_datos(1, 1, id=id_fijo, fecha_creacion_cliente=fecha_fija, firma_base64="BBBB"))
+    a = payload_raw_canonico(_datos(1, 1, id=id_fijo, fecha_creacion_cliente=fecha_fija, firma_base64=firma_png()))
+    b = payload_raw_canonico(_datos(1, 1, id=id_fijo, fecha_creacion_cliente=fecha_fija, firma_base64=firma_png(color="blue")))
     assert a != b
 
 

@@ -1,6 +1,8 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { db } from "./dexie";
 import { procesarOutbox } from "./outbox";
+import { guardarSesionTurno, cerrarSesion } from "../auth/session";
+import { tokenDeTecnico } from "../test/token";
 
 const ORDEN_BASE = {
   contrato_id: 1, equipo_serie: "RO-1", tecnico_id: 1, tipo_intervencion: "PREVENTIVO",
@@ -18,6 +20,7 @@ async function agregarPendiente(id: string, over: Partial<typeof ORDEN_BASE> = {
 describe("procesarOutbox", () => {
   beforeEach(async () => {
     await db.ordenesLocal.clear();
+    await guardarSesionTurno(tokenDeTecnico());
   });
 
   it("marca sincronizada en exito", async () => {
@@ -99,6 +102,15 @@ describe("procesarOutbox", () => {
     expect(o?.error_detalle).toContain("stock 2, se piden 5");
   });
 
+  it("un fallo temporal al reconciliar 409 conserva pendiente para comprobar después", async () => {
+    await agregarPendiente("reconciliar");
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (_input, init) => init?.method === "POST"
+      ? new Response(JSON.stringify({ detail: "Conflicto" }), { status: 409 })
+      : new Response(JSON.stringify({ detail: "Servidor caído" }), { status: 503 }));
+    await procesarOutbox();
+    expect((await db.ordenesLocal.get("reconciliar"))?.estado_sync).toBe("pendiente");
+  });
+
   it("no envia campos de bookkeeping local (estado_sync, error_detalle, etc.) al backend", async () => {
     await agregarPendiente("44444444-4444-4444-4444-444444444444");
     const f = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ id: "1" }), { status: 201 }));
@@ -109,5 +121,109 @@ describe("procesarOutbox", () => {
     expect(enviado).not.toHaveProperty("creado_en_local");
     expect(enviado).not.toHaveProperty("intentos_sync");
     expect(enviado.id).toBe("44444444-4444-4444-4444-444444444444");
+  });
+
+  it.each([null, "token-malformado", tokenDeTecnico(1, 1)])("sin sesión transmisible no toca las actas ni envía: %s", async (token) => {
+    await cerrarSesion();
+    if (token) await guardarSesionTurno(token);
+    await db.ordenesLocal.add({ ...ORDEN_BASE, id: "atascada", estado_sync: "sincronizando" });
+    const fetch = vi.spyOn(globalThis, "fetch").mockRejectedValue(new TypeError("sin red"));
+    await procesarOutbox();
+    expect(fetch).not.toHaveBeenCalled();
+    expect((await db.ordenesLocal.get("atascada"))?.estado_sync).toBe("sincronizando");
+  });
+
+  it("un 401 conserva pendiente, pausa la pasada y espera nuevo login para reintentar", async () => {
+    await agregarPendiente("a");
+    await agregarPendiente("b");
+    const fetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ detail: "Token inválido" }), { status: 401 }));
+    await procesarOutbox();
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect((await db.ordenesLocal.get("a"))?.estado_sync).toBe("pendiente");
+    expect((await db.ordenesLocal.get("b"))?.estado_sync).toBe("pendiente");
+    await procesarOutbox();
+    expect(fetch).toHaveBeenCalledTimes(1);
+    await guardarSesionTurno(tokenDeTecnico(1, Math.floor(Date.now() / 1000) + 7200));
+    fetch.mockImplementation(async () => new Response(JSON.stringify({ id: "ok" }), { status: 201 }));
+    await procesarOutbox();
+    expect((await db.ordenesLocal.get("a"))?.estado_sync).toBe("sincronizada");
+    expect((await db.ordenesLocal.get("b"))?.estado_sync).toBe("sincronizada");
+  });
+
+  it("sólo recupera y transmite las órdenes del técnico de la sesión", async () => {
+    await guardarSesionTurno(tokenDeTecnico(2));
+    await db.ordenesLocal.bulkAdd([
+      { ...ORDEN_BASE, id: "a", estado_sync: "sincronizando" },
+      { ...ORDEN_BASE, id: "b", tecnico_id: 2, estado_sync: "pendiente" },
+    ]);
+    const fetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ id: "ok" }), { status: 201 }));
+    await procesarOutbox();
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(fetch.mock.calls[0][1]?.body as string).id).toBe("b");
+    expect((await db.ordenesLocal.get("a"))?.estado_sync).toBe("sincronizando");
+  });
+
+  it("al cambiar usuario durante la pasada no envía la siguiente acta con otra identidad", async () => {
+    await agregarPendiente("a");
+    await agregarPendiente("b");
+    const fetch = vi.spyOn(globalThis, "fetch").mockImplementation(async () => {
+      await guardarSesionTurno(tokenDeTecnico(2));
+      return new Response(JSON.stringify({ id: "ok" }), { status: 201 });
+    });
+    await procesarOutbox();
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect((await db.ordenesLocal.get("b"))?.estado_sync).toBe("pendiente");
+  });
+
+  it("una sesión cambia después del último await: el envío conserva el token de su dueño", async () => {
+    const tokenA = tokenDeTecnico(1);
+    await guardarSesionTurno(tokenA);
+    await agregarPendiente("a");
+    await agregarPendiente("b");
+    const get = db.sesion.get.bind(db.sesion);
+    let lecturas = 0;
+    vi.spyOn(db.sesion, "get").mockImplementation((key) => get(key).then(async (sesion) => {
+      if (++lecturas === 3) await guardarSesionTurno(tokenDeTecnico(2));
+      return sesion;
+    }));
+    const fetch = vi.spyOn(globalThis, "fetch").mockImplementation(async () => new Response(JSON.stringify({ id: "ok" }), { status: 201 }));
+    await procesarOutbox();
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(new Headers(fetch.mock.calls[0][1]?.headers).get("Authorization")).toBe(`Bearer ${tokenA}`);
+    expect((await db.ordenesLocal.get("b"))?.estado_sync).toBe("pendiente");
+  });
+
+  it("si cambia la sesión ante un 409 pendiente de reconciliar, conserva el acta pendiente", async () => {
+    await agregarPendiente("a");
+    vi.spyOn(globalThis, "fetch").mockImplementation(async () => {
+      await guardarSesionTurno(tokenDeTecnico(2));
+      return new Response(JSON.stringify({ detail: "Conflicto" }), { status: 409 });
+    });
+    await procesarOutbox();
+    expect((await db.ordenesLocal.get("a"))?.estado_sync).toBe("pendiente");
+  });
+
+  it("un 401 antiguo no invalida un nuevo login aunque haya recibido el mismo JWT", async () => {
+    const token = tokenDeTecnico();
+    await guardarSesionTurno(token);
+    await agregarPendiente("a");
+    vi.spyOn(globalThis, "fetch").mockImplementation(async () => {
+      await db.sesion.put({ id: "actual", token, guardado_en: "2030-01-01T00:00:00Z" });
+      return new Response(JSON.stringify({ detail: "No autenticado" }), { status: 401 });
+    });
+    await procesarOutbox();
+    expect((await db.sesion.get("actual"))?.requiere_renovacion).not.toBe(true);
+    expect((await db.ordenesLocal.get("a"))?.estado_sync).toBe("pendiente");
+  });
+
+  it("recupera errores 401 antiguos identificables sin reintentar errores de negocio", async () => {
+    await db.ordenesLocal.bulkAdd([
+      { ...ORDEN_BASE, id: "a", estado_sync: "error", error_detalle: "No autenticado" },
+      { ...ORDEN_BASE, id: "b", estado_sync: "error", error_detalle: "stock insuficiente" },
+    ]);
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ id: "ok" }), { status: 201 }));
+    await procesarOutbox();
+    expect((await db.ordenesLocal.get("a"))?.estado_sync).toBe("sincronizada");
+    expect((await db.ordenesLocal.get("b"))?.estado_sync).toBe("error");
   });
 });

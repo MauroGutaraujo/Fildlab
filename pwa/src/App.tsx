@@ -1,15 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { QueryClient, QueryClientProvider, useMutation, useQueryClient } from "@tanstack/react-query";
-import { cerrarSesion, decodeTecnicoId, obtenerToken } from "./auth/session";
+import { cerrarSesion, decodeTecnicoId, EVENTO_SESION, tokenVigente } from "./auth/session";
 import { LoginTurno } from "./auth/LoginTurno";
 import { buscarEquipos, refrescarCatalogo } from "./db/catalogo";
-import type { CatalogoItem } from "./db/dexie";
+import { db, type CatalogoItem } from "./db/dexie";
 import { procesarOutbox } from "./db/outbox";
 import { MisOrdenes } from "./features/orden/MisOrdenes";
 import { OrdenForm } from "./features/orden/OrdenForm";
 import { StockMovil } from "./features/stock/StockMovil";
-
-const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
 function BotonSincronizar() {
   const qc = useQueryClient();
@@ -152,6 +150,7 @@ function EquipoPicker({ onElegido }: { onElegido: (equipo: EquipoConContrato) =>
 }
 
 export function App() {
+  const [queryClient] = useState(() => new QueryClient({ defaultOptions: { queries: { retry: false } } }));
   return (
     <QueryClientProvider client={queryClient}>
       <AppInterna />
@@ -166,8 +165,16 @@ type NavItem = {
   equipo: EquipoConContrato | null;
 };
 
+function puedeNavegar(): boolean {
+  return window.dispatchEvent(new CustomEvent("fildlab:antes-navegar", { cancelable: true }));
+}
+
 function AppInterna() {
+  const qc = useQueryClient();
   const [token, setToken] = useState<string | null>(null);
+  const tokenActual = useRef<string | null>(null);
+  const [requiereRenovacion, setRequiereRenovacion] = useState(false);
+  const [renovando, setRenovando] = useState(false);
   const [cargando, setCargando] = useState(true);
 
   // Pila de navegación interna para retroceder cuantas veces sea necesario sin trabas
@@ -178,10 +185,30 @@ function AppInterna() {
   const ignorarPop = useRef(false);
 
   useEffect(() => {
-    obtenerToken()
-      .then(setToken)
-      .finally(() => setCargando(false));
-  }, []);
+    let activo = true;
+    const actualizar = async () => {
+      const sesion = await db.sesion.get("actual");
+      if (!activo) return;
+      const nuevoToken = sesion?.token ?? null;
+      if (tokenActual.current !== nuevoToken) {
+        qc.clear();
+        setPila([{ pantalla: "equipo", equipo: null }]);
+        setRenovando(false);
+        tokenActual.current = nuevoToken;
+      }
+      setToken(nuevoToken);
+      setRequiereRenovacion(!!sesion && (!!sesion.requiere_renovacion || !tokenVigente(sesion.token)));
+      setCargando(false);
+    };
+    void actualizar();
+    window.addEventListener(EVENTO_SESION, actualizar);
+    const intervalo = window.setInterval(() => { void actualizar(); }, 30_000);
+    return () => {
+      activo = false;
+      window.removeEventListener(EVENTO_SESION, actualizar);
+      window.clearInterval(intervalo);
+    };
+  }, [qc]);
 
   // Al abrir la app (sobre todo instalada como PWA), la pantalla raíz "equipo" queda parada
   // justo sobre la ÚNICA entrada de historial nativo que existe (la del lanzamiento). Sin una
@@ -198,6 +225,10 @@ function AppInterna() {
     const manejarPopState = () => {
       if (ignorarPop.current) {
         ignorarPop.current = false;
+        return;
+      }
+      if (!puedeNavegar()) {
+        try { window.history.pushState({ depth: pila.length - 1 }, ""); } catch {}
         return;
       }
       setPila((prev) => {
@@ -226,6 +257,7 @@ function AppInterna() {
   const equipo = actual.equipo;
 
   const irA = (nuevaPantalla: PantallaTipo, nuevoEquipo: EquipoConContrato | null = null) => {
+    if (!puedeNavegar()) return;
     // Si ya estamos exactamente en esta vista, no acumular
     if (actual.pantalla === nuevaPantalla && actual.equipo?.serie === nuevoEquipo?.serie) {
       return;
@@ -252,6 +284,7 @@ function AppInterna() {
   };
 
   const volver = () => {
+    if (!puedeNavegar()) return;
     setPila((prev) => {
       if (prev.length > 1) {
         return prev.slice(0, -1);
@@ -276,9 +309,17 @@ function AppInterna() {
     );
   }
 
-  if (!token) return <LoginTurno onIngreso={() => obtenerToken().then(setToken)} />;
-
-  const tecnicoId = decodeTecnicoId(token) ?? 1;
+  const tecnicoId = token ? decodeTecnicoId(token) : null;
+  if (tecnicoId === null || renovando) return (
+    <>
+      {renovando && <button type="button" onClick={() => setRenovando(false)}>Continuar sin conexión</button>}
+      <LoginTurno onIngreso={() => {
+        qc.clear();
+        setPila([{ pantalla: "equipo", equipo: null }]);
+        setRenovando(false);
+      }} />
+    </>
+  );
 
   return (
     <div className="flex min-h-screen flex-col justify-between bg-slate-100 antialiased selection:bg-blue-100 selection:text-blue-900">
@@ -327,7 +368,11 @@ function AppInterna() {
           <button
             type="button"
             onClick={async () => {
+              if (!puedeNavegar()) return;
               await cerrarSesion();
+              qc.clear();
+              setPila([{ pantalla: "equipo", equipo: null }]);
+              setRenovando(false);
               setToken(null);
             }}
             className="min-h-10 rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-sm font-semibold text-white transition hover:bg-white/15 active:scale-95"
@@ -340,6 +385,12 @@ function AppInterna() {
 
       {/* Contenido principal según pantalla activa */}
       <main className="mx-auto w-full max-w-lg flex-1">
+        {requiereRenovacion && (
+          <div role="alert" className="m-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
+            <p>Renueva la sesión para sincronizar. Puedes seguir trabajando sin conexión; tus datos permanecen guardados.</p>
+            <button type="button" onClick={() => { if (puedeNavegar()) setRenovando(true); }} className="mt-2 font-semibold underline">Renovar sesión</button>
+          </div>
+        )}
         {pantalla === "equipo" && (
           <EquipoPicker
             onElegido={(e) => irA("orden", e)}
@@ -348,6 +399,7 @@ function AppInterna() {
 
         {pantalla === "orden" && equipo && tecnicoId !== null && (
           <OrdenForm
+            key={`${tecnicoId}:${equipo.serie}`}
             contratoId={equipo.contrato_id}
             equipoSerie={equipo.serie}
             tecnicoId={tecnicoId}
@@ -358,13 +410,13 @@ function AppInterna() {
 
         {pantalla === "stock" && (
           <div className="pb-28">
-            <StockMovil />
+            <StockMovil tecnicoId={tecnicoId} />
           </div>
         )}
 
         {pantalla === "misOrdenes" && (
           <div className="pb-28">
-            <MisOrdenes />
+            <MisOrdenes tecnicoId={tecnicoId} />
           </div>
         )}
       </main>

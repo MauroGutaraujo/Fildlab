@@ -1,0 +1,2 @@
+# Entorno ML: restricciones transitivas incluidas también en el paquete instalable.
+-c app/ml/recursos/constraints-ml.txt

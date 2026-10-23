@@ -58,6 +58,10 @@ async def sincronizar(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Equipo no encontrado") from None
     except ordenes_svc.ContratoNoEncontrado:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Contrato no encontrado") from None
+    except ordenes_svc.OrdenIdReutilizado as e:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(e)) from None
+    except ordenes_svc.ContratoInvalido as e:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(e)) from None
     except inv.StockInsuficiente as e:
         raise HTTPException(status.HTTP_409_CONFLICT, str(e)) from None
     except inv.RepuestoNoEncontrado as e:

@@ -1,7 +1,7 @@
 from functools import lru_cache
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
-from pydantic import field_validator
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 MIN_JWT_SECRET = 32
@@ -14,6 +14,27 @@ class Settings(BaseSettings):
     jwt_secret: str
     jwt_algorithm: str = "HS256"
     jwt_expire_min: int = 60
+    cors_origins: list[str] = [
+        "https://fildlab.pages.dev", "https://fildlab-pwa.pages.dev",
+        "http://localhost:5173", "http://localhost:5174",
+    ]
+    max_request_body_bytes: int = Field(default=2 * 1024 * 1024, ge=1024, le=16 * 1024 * 1024)
+    request_body_timeout_seconds: float = Field(default=15, gt=0, le=120)
+    login_attempts_per_window: int = Field(default=10, ge=1, le=1000)
+    login_global_attempts_per_window: int = Field(default=60, ge=1, le=10000)
+    login_window_seconds: int = Field(default=60, ge=1, le=3600)
+    password_verify_concurrency: int = Field(default=2, ge=1, le=8)
+
+    @field_validator("cors_origins")
+    @classmethod
+    def _explicit_origins(cls, values: list[str]) -> list[str]:
+        for value in values:
+            parts = urlsplit(value)
+            if (parts.scheme not in {"http", "https"} or not parts.hostname
+                    or "*" in value or parts.path or parts.query or parts.fragment
+                    or parts.username or parts.password):
+                raise ValueError("CORS_ORIGINS debe contener orígenes HTTP(S) explícitos sin ruta")
+        return values
 
     @field_validator("database_url")
     @classmethod

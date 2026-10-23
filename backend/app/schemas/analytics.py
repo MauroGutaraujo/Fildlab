@@ -16,6 +16,7 @@ class ContratoRentabilidadOut(BaseModel):
     costo_repuestos_soles: Decimal
     margen_soles: Decimal
     margen_pct: float | None
+    historial_completo: bool = False
 
 
 class RentabilidadOut(BaseModel):
