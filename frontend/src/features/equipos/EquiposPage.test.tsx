@@ -307,8 +307,8 @@ describe("EquiposPage", () => {
     renderWithProviders(<EquiposPage />);
     expect(await screen.findByText(/prioridad experimental alta/i)).toBeInTheDocument();
     expect(screen.getByText(/RO-2026-0001 — 12 días estimados/i)).toBeInTheDocument();
-    expect(screen.getByText(/estimación experimental basada en datos sintéticos/i)).toBeInTheDocument();
-    expect(screen.getByText(/no certifica la calidad del agua/i)).toBeInTheDocument();
+    expect(screen.queryByText(/estimación experimental basada en datos sintéticos/i)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /ver ejecuciones de IA/i })).toBeInTheDocument();
     expect(screen.getByText(/22\/10\/2026/)).toHaveAttribute("datetime", "2026-10-22T15:00:00Z");
   });
 
