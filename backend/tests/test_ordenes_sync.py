@@ -49,6 +49,34 @@ async def test_post_ordenes_mismo_id_dos_veces_200_sin_duplicar(client, crear_us
     assert r1.json()["id"] == r2.json()["id"]
 
 
+async def test_post_ordenes_mismo_id_con_contenido_distinto_rechaza_y_conserva_acta(
+    client, crear_usuario, auth_headers, crear_cliente, db,
+):
+    from sqlalchemy import func, select
+    from app.models.orden import ActaInmutable, OrdenServicio
+
+    tec = await crear_usuario("TECNICO")
+    cid = await _preparar(crear_cliente, db)
+    body = _body(tec.id, cid)
+    creado = await client.post("/api/v1/ordenes", json=body, headers=auth_headers(tec))
+    acta_original = await client.get(f"/api/v1/ordenes/{body['id']}/acta", headers=auth_headers(tec))
+
+    repetido_modificado = await client.post(
+        "/api/v1/ordenes",
+        json={**body, "tipo_intervencion": "CORRECTIVO"},
+        headers=auth_headers(tec),
+    )
+    acta_despues = await client.get(f"/api/v1/ordenes/{body['id']}/acta", headers=auth_headers(tec))
+
+    assert creado.status_code == 201
+    assert repetido_modificado.status_code == 422
+    assert "contenido distinto" in repetido_modificado.json()["detail"].lower()
+    assert acta_despues.json()["payload_raw"] == acta_original.json()["payload_raw"]
+    assert acta_despues.json()["hash_sha256"] == acta_original.json()["hash_sha256"]
+    assert await db.scalar(select(func.count()).select_from(OrdenServicio)) == 1
+    assert await db.scalar(select(func.count()).select_from(ActaInmutable)) == 1
+
+
 @pytest.mark.parametrize("campo", list(LECTURAS.keys()))
 async def test_post_ordenes_lectura_faltante_422(client, crear_usuario, auth_headers, crear_cliente, db, campo):
     tec = await crear_usuario("TECNICO")
