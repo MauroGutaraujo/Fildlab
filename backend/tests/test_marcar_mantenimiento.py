@@ -23,12 +23,14 @@ async def test_marcar_mantenimiento_sin_token_401(client):
     assert (await client.post("/api/v1/equipos/EQ-1/marcar-mantenimiento")).status_code == 401
 
 
-async def test_marcar_mantenimiento_pone_fecha_de_hoy(client, gerente_h, db, crear_cliente):
-    await _equipo(db, crear_cliente)
+async def test_endpoint_antiguo_retirado_no_reinicia_fecha(client, gerente_h, db, crear_cliente):
+    equipo = await _equipo(db, crear_cliente)
+    equipo.fecha_ultima_mantencion = date(2026, 1, 10)
     await db.commit()
     r = await client.post("/api/v1/equipos/EQ-1/marcar-mantenimiento", headers=gerente_h)
-    assert r.status_code == 200
-    assert r.json()["fecha_ultima_mantencion"] == date.today().isoformat()
+    assert r.status_code == 410
+    await db.refresh(equipo)
+    assert equipo.fecha_ultima_mantencion == date(2026, 1, 10)
 
 
 async def test_marcar_mantenimiento_equipo_inexistente_404(client, gerente_h):

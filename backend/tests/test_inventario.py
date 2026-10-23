@@ -142,6 +142,30 @@ async def test_repuesto_inexistente_404(client, gerente_h):
     assert (await client.get("/api/v1/repuestos/NOPE", headers=gerente_h)).status_code == 404
 
 
+@pytest.mark.parametrize("tipo", ["ENTRADA", "SALIDA_ORDEN", "AJUSTE_ENTRADA", "AJUSTE_SALIDA"])
+async def test_orden_firmada_solo_admite_correcciones_por_adenda(client, gerente_h, crear_orden, db, tipo):
+    from app.models.orden import ActaInmutable
+
+    await _repuesto(client, gerente_h)
+    await _mov(client, gerente_h, repuesto_codigo="FILT-05", tipo="ENTRADA", cantidad=10)
+    orden = await crear_orden()
+    db.add(ActaInmutable(orden_id=orden.id, payload_raw="legacy", hash_sha256="a" * 64,
+                         firma_base64="AAAA", gps_latitud=-8, gps_longitud=-79))
+    await db.flush()
+    response = await _mov(client, gerente_h, repuesto_codigo="FILT-05", tipo=tipo, cantidad=1, orden_id=str(orden.id))
+    assert response.status_code == 409
+    assert "adenda" in response.json()["detail"].lower()
+    assert await _stock(client, gerente_h) == 10
+    assert await db.scalar(select(func.count()).select_from(MovimientoInventario)) == 1
+
+
+async def test_orden_liquidada_sin_acta_heredada_tambien_requiere_adenda(client, gerente_h, crear_orden):
+    await _repuesto(client, gerente_h)
+    orden = await crear_orden(estado="LIQUIDADA")
+    response = await _mov(client, gerente_h, repuesto_codigo="FILT-05", tipo="AJUSTE_ENTRADA", cantidad=1, orden_id=str(orden.id))
+    assert response.status_code == 409
+
+
 async def test_dos_salidas_concurrentes_no_dejan_stock_negativo(engine):
     """Dos transacciones reales (commit) compiten por el mismo stock: solo una gana."""
     async with AsyncSession(engine, expire_on_commit=False) as s:

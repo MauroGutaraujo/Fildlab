@@ -41,4 +41,6 @@ class MovimientoInventario(Base):
     orden_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("ordenes_servicio.id"))
     venta_id: Mapped[int | None] = mapped_column(ForeignKey("ventas.id"))
     usuario_id: Mapped[int] = mapped_column(ForeignKey("usuarios.id"))
+    costo_unitario_soles: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
+    costo_historico_confirmado: Mapped[bool] = mapped_column(default=False, server_default="false")
     creado_en: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

@@ -32,6 +32,8 @@ export interface OrdenLocal {
   tecnico_id: number;
   tipo_intervencion: string;
   fecha_creacion_cliente: string;
+  fecha_solicitud?: string;
+  fecha_primera_atencion?: string;
   lecturas_agua: LecturasAgua;
   firma_base64: string;
   gps_latitud: number;
@@ -39,6 +41,7 @@ export interface OrdenLocal {
   repuestos_consumidos: RepuestoConsumido[];
   estado_sync: EstadoSync;
   error_detalle?: string;
+  error_status?: number;
   creado_en_local: string;
   intentos_sync: number;
 }
@@ -54,6 +57,28 @@ export interface SesionTurno {
   id: "actual";
   token: string;
   guardado_en: string;
+  requiere_renovacion?: boolean;
+}
+
+export interface StockTecnicoItem extends StockMovilItem {
+  tecnico_id: number;
+}
+
+export interface BorradorOrden {
+  id: string;
+  revision: number;
+  fecha_solicitud?: string;
+  fecha_primera_atencion?: string;
+  tecnico_id: number;
+  equipo_serie: string;
+  contrato_id: number;
+  tipo_intervencion: "PREVENTIVO" | "CORRECTIVO";
+  lecturas: Record<keyof LecturasAgua, string>;
+  firma_base64: string | null;
+  gps_latitud: number | null;
+  gps_longitud: number | null;
+  repuestos_consumidos: RepuestoConsumido[];
+  creado_en_local: string;
 }
 
 class FildlabDB extends Dexie {
@@ -61,6 +86,8 @@ class FildlabDB extends Dexie {
   ordenesLocal!: Table<OrdenLocal, string>;
   stockMovilLocal!: Table<StockMovilItem, string>;
   sesion!: Table<SesionTurno, string>;
+  stockPorTecnico!: Table<StockTecnicoItem, [number, string]>;
+  borradoresOrden!: Table<BorradorOrden, [number, string]>;
 
   constructor() {
     super("fildlab-pwa");
@@ -69,6 +96,13 @@ class FildlabDB extends Dexie {
       ordenesLocal: "id, estado_sync, creado_en_local",
       stockMovilLocal: "repuesto_codigo, turno_id",
       sesion: "id",
+    });
+    // El stock v1 no tiene propietario: se conserva para reconciliarlo, nunca
+    // se asigna automáticamente al siguiente usuario del dispositivo.
+    this.version(2).stores({
+      ordenesLocal: "id, estado_sync, creado_en_local, tecnico_id",
+      stockPorTecnico: "[tecnico_id+repuesto_codigo], tecnico_id",
+      borradoresOrden: "[tecnico_id+equipo_serie], &id, tecnico_id",
     });
   }
 }

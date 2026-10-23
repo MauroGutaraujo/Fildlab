@@ -7,6 +7,8 @@ from app.core.deps import get_current_user, require_role
 from app.models.cliente import Cliente
 from app.models.contrato import Contrato
 from app.schemas.contrato import ContratoIn, ContratoOut, ContratoUpdate
+from app.services.condiciones import asegurar_base, guardar_condicion, proximo_mes
+from datetime import date, datetime, timezone
 
 router = APIRouter(prefix="/contratos", tags=["contratos"], dependencies=[Depends(get_current_user)])
 solo_gerencia = Depends(require_role("GERENCIA"))  # RN-01
@@ -43,26 +45,36 @@ async def crear(datos: ContratoIn, session: AsyncSession = Depends(get_session))
     session.add(contrato)
     await session.flush()
     await session.refresh(contrato)
+    await guardar_condicion(session, contrato, date.min, "REGISTRADO")
     return contrato
 
 
 @router.put("/{contrato_id}", response_model=ContratoOut, dependencies=[solo_gerencia])
 async def actualizar(contrato_id: int, datos: ContratoUpdate, session: AsyncSession = Depends(get_session)):
-    contrato = await _obtener(session, contrato_id)
+    contrato = (await session.execute(select(Contrato).where(Contrato.id == contrato_id).with_for_update())).scalar_one_or_none()
+    if contrato is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Contrato no encontrado")
     if contrato.estado == "ANULADO":
         raise HTTPException(status.HTTP_409_CONFLICT, "Un contrato anulado no se puede modificar")
+    await asegurar_base(session, contrato)
     for campo, valor in datos.model_dump().items():
         setattr(contrato, campo, valor)
     await session.flush()
     await session.refresh(contrato)
+    await guardar_condicion(session, contrato, proximo_mes(), "REGISTRADO")
     return contrato
 
 
 @router.post("/{contrato_id}/anular", response_model=ContratoOut, dependencies=[solo_gerencia])
 async def anular(contrato_id: int, session: AsyncSession = Depends(get_session)):
-    contrato = await _obtener(session, contrato_id)
+    contrato = (await session.execute(select(Contrato).where(Contrato.id == contrato_id).with_for_update())).scalar_one_or_none()
+    if contrato is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Contrato no encontrado")
     if contrato.estado == "ANULADO":
         raise HTTPException(status.HTTP_409_CONFLICT, "El contrato ya está anulado")
+    await asegurar_base(session, contrato)
     contrato.estado = "ANULADO"
+    contrato.anulado_en = datetime.now(timezone.utc)
     await session.flush()
+    await guardar_condicion(session, contrato, proximo_mes(), "REGISTRADO")
     return contrato

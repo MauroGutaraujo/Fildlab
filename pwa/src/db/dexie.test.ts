@@ -1,7 +1,22 @@
 import { describe, expect, it, beforeEach } from "vitest";
 import { db } from "./dexie";
+import Dexie from "dexie";
 
 describe("esquema Dexie", () => {
+  it("actualiza desde v1 conservando stock sin dueño y órdenes anteriores", async () => {
+    await db.delete();
+    const antigua = new Dexie(db.name);
+    antigua.version(1).stores({ catalogoLocal: "id, tipo", ordenesLocal: "id, estado_sync, creado_en_local", stockMovilLocal: "repuesto_codigo, turno_id", sesion: "id" });
+    try {
+      await antigua.table("stockMovilLocal").put({ repuesto_codigo: "LEGADO", cantidad_cargada: 10, cantidad_consumida: 2, turno_id: "turno-antiguo" });
+      await antigua.table("ordenesLocal").put({ id: "acta-antigua", tecnico_id: 7, estado_sync: "pendiente", creado_en_local: "2026-10-01" });
+    } finally { antigua.close(); }
+    await db.open();
+    expect((await db.stockMovilLocal.get("LEGADO"))?.cantidad_consumida).toBe(2);
+    expect(await db.ordenesLocal.where("tecnico_id").equals(7).count()).toBe(1);
+    expect(await db.stockPorTecnico.count()).toBe(0);
+    expect(await db.borradoresOrden.count()).toBe(0);
+  });
   beforeEach(async () => {
     await db.ordenesLocal.clear();
   });

@@ -1,24 +1,24 @@
 import os
-from pathlib import Path
+from uuid import uuid4
 
 import pytest
-from dotenv import load_dotenv
-
-load_dotenv(Path(__file__).resolve().parents[1] / ".env")
-os.environ.setdefault("JWT_SECRET", "test-secret-no-usar-en-produccion-0123456789")
+os.environ["JWT_SECRET"] = "test-secret-no-usar-en-produccion-0123456789"
 _database_url_original = os.environ.get("DATABASE_URL", "")
-os.environ["DATABASE_URL"] = os.environ.get("DATABASE_URL_TEST", "")
+os.environ["DATABASE_URL"] = os.environ.get("DATABASE_URL_TEST") or "postgresql://unavailable@127.0.0.1/test_unconfigured"
 
 import pytest_asyncio  # noqa: E402
 from httpx import ASGITransport, AsyncClient  # noqa: E402
 from sqlalchemy import text  # noqa: E402
-from sqlalchemy.ext.asyncio import AsyncSession  # noqa: E402
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker  # noqa: E402
 
+from app.core.config import Settings, get_settings  # noqa: E402
+
+# Disable dotenv before importing any application module or constructing Settings.
+# pytest never reads deployment credentials, including when no integration DB exists.
+Settings.model_config["env_file"] = None
+get_settings.cache_clear()
 from app.core import db as dbmod  # noqa: E402
-from app.core.db import assert_distinct_test_database  # noqa: E402
-
-assert_distinct_test_database(_database_url_original, os.environ.get("DATABASE_URL_TEST", ""))
-from app.main import app  # noqa: E402
+from app.main import create_app  # noqa: E402
 from app.models import Base  # noqa: E402
 
 
@@ -26,13 +26,32 @@ from app.models import Base  # noqa: E402
 async def engine():
     if not os.environ.get("DATABASE_URL_TEST"):
         pytest.skip("DATABASE_URL_TEST no configurada")
-    eng = dbmod.make_engine(os.environ["DATABASE_URL_TEST"])
-    async with eng.begin() as conn:
-        await conn.execute(text("DROP SCHEMA public CASCADE"))
-        await conn.execute(text("CREATE SCHEMA public"))
-        await conn.run_sync(Base.metadata.create_all)
-    yield eng
-    await eng.dispose()
+    url = os.environ["DATABASE_URL_TEST"]
+    dbmod.assert_distinct_test_database(_database_url_original, url)
+    dbmod.assert_safe_test_target(url)
+    schema = f"test_{uuid4().hex}"
+    eng = dbmod.make_engine(url, schema=schema)
+    created = False
+    previous_engine, previous_sessionmaker = dbmod._engine, dbmod._sessionmaker
+    try:
+        async with eng.begin() as conn:
+            await conn.execute(text(f'CREATE SCHEMA "{schema}"'))
+        created = True
+        async with eng.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        # Concurrency tests use real per-request sessions rather than the db
+        # override. Route them through the same private schema as all fixtures.
+        dbmod._engine = eng
+        dbmod._sessionmaker = async_sessionmaker(eng, expire_on_commit=False)
+        yield eng
+    finally:
+        dbmod._engine, dbmod._sessionmaker = previous_engine, previous_sessionmaker
+        try:
+            if created:
+                async with eng.begin() as conn:
+                    await conn.execute(text(f'DROP SCHEMA "{schema}" CASCADE'))
+        finally:
+            await eng.dispose()
 
 
 @pytest_asyncio.fixture
@@ -136,10 +155,13 @@ async def tecnico_h(crear_usuario, auth_headers):
 
 @pytest_asyncio.fixture
 async def client(db):
+    app = create_app()
     async def _override():
         yield db
 
     app.dependency_overrides[dbmod.get_session] = _override
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
-        yield c
-    app.dependency_overrides.clear()
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
+            yield c
+    finally:
+        app.dependency_overrides.clear()

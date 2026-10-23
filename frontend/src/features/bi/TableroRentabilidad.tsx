@@ -12,6 +12,7 @@ type ContratoRentabilidad = {
   costo_repuestos_soles: string;
   margen_soles: string;
   margen_pct: number | null;
+  historial_completo?: boolean;
 };
 type RentabilidadResp = { periodo: string; contratos: ContratoRentabilidad[] };
 
@@ -69,6 +70,8 @@ export function TableroRentabilidad({ periodo }: { periodo: string }) {
       <div>
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-blue-700">Contratos y repuestos</p>
         <h2 className="mt-1 text-lg font-bold tracking-tight text-slate-900">Rentabilidad por contrato</h2>
+        <p className="mt-2 text-sm text-slate-600">Margen contractual mensual menos repuestos de órdenes liquidadas. No incluye mano de obra, prorrateo ni ventas.</p>
+        {data.contratos.some((c) => !c.historial_completo) && <p role="note" className="mt-2 text-sm text-amber-800">Hay datos heredados sin historial completo de tarifas o costos; sus márgenes son estimaciones.</p>}
       </div>
       <ReactEChartsCore echarts={echarts} option={option} style={{ height: 360 }} />
     </div>

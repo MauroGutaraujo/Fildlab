@@ -1,7 +1,10 @@
 from datetime import date, timedelta
+from unittest.mock import AsyncMock
 
 import pytest
+from fastapi import HTTPException
 
+from app.api.v1.equipos import _validar_contrato
 from app.models.contrato import Contrato
 
 RUC = "20612493821"
@@ -22,6 +25,16 @@ BODY = {
     "fecha_instalacion": "2026-01-15",
     "parametros_nominales": PARAMETROS_COMPLETOS,
 }
+
+
+async def test_validacion_rechaza_contrato_anulado_antes_de_asociar():
+    contrato = Contrato(id=7, cliente_ruc=RUC, estado="ANULADO")
+    session = AsyncMock()
+    session.get.return_value = contrato
+    with pytest.raises(HTTPException) as error:
+        await _validar_contrato(session, 7, RUC)
+    assert error.value.status_code == 422
+    assert "anulado" in error.value.detail.lower()
 
 
 @pytest.fixture
@@ -127,6 +140,28 @@ async def test_contrato_del_mismo_cliente_ok(client, gerente_h, cliente, crear_c
     assert r.status_code == 201 and r.json()["contrato_id"] == c.id
 
 
+async def test_crear_con_contrato_anulado_no_guarda_equipo(client, gerente_h, cliente, crear_contrato, db):
+    c = await crear_contrato()
+    c.estado = "ANULADO"
+    await db.flush()
+    r = await client.post("/api/v1/equipos", json={**BODY, "contrato_id": c.id}, headers=gerente_h)
+    assert r.status_code == 422
+    assert "anulado" in r.json()["detail"].lower()
+    assert (await client.get(f"/api/v1/equipos/{BODY['serie']}", headers=gerente_h)).status_code == 404
+
+
+async def test_asociar_contrato_anulado_conserva_equipo_legado(client, gerente_h, cliente, crear_contrato, db):
+    await client.post("/api/v1/equipos", json=BODY, headers=gerente_h)
+    c = await crear_contrato()
+    c.estado = "ANULADO"
+    await db.flush()
+    r = await client.put(f"/api/v1/equipos/{BODY['serie']}", json={"contrato_id": c.id}, headers=gerente_h)
+    assert r.status_code == 422
+    listado = (await client.get("/api/v1/equipos", headers=gerente_h)).json()
+    assert listado[0]["contrato_id"] is None
+    assert listado[0]["parametros_nominales"] == PARAMETROS_COMPLETOS
+
+
 async def test_fecha_instalacion_futura_422(client, gerente_h, cliente):
     manana = (date.today() + timedelta(days=1)).isoformat()
     assert (await client.post("/api/v1/equipos", json={**BODY, "fecha_instalacion": manana}, headers=gerente_h)).status_code == 422
@@ -164,6 +199,26 @@ async def test_actualizar_parametros_y_contrato(client, gerente_h, cliente, crea
         f"/api/v1/equipos/{BODY['serie']}", json={"parametros_nominales": {"ph": 7.2}}, headers=gerente_h
     )
     assert incompleto.status_code == 422
+
+
+async def test_desvincular_contrato_conserva_datos_legados(client, gerente_h, cliente, crear_contrato):
+    contrato = await crear_contrato()
+    await client.post("/api/v1/equipos", json={**BODY, "contrato_id": contrato.id}, headers=gerente_h)
+    r = await client.put(f"/api/v1/equipos/{BODY['serie']}", json={"contrato_id": None}, headers=gerente_h)
+    assert r.status_code == 200
+    assert r.json()["contrato_id"] is None
+    assert r.json()["parametros_nominales"] == PARAMETROS_COMPLETOS
+
+
+async def test_actualizar_contrato_ajeno_conserva_asociacion(client, gerente_h, cliente, crear_cliente, crear_contrato):
+    contrato = await crear_contrato()
+    await crear_cliente("20111111111")
+    ajeno = await crear_contrato("20111111111")
+    await client.post("/api/v1/equipos", json={**BODY, "contrato_id": contrato.id}, headers=gerente_h)
+    r = await client.put(f"/api/v1/equipos/{BODY['serie']}", json={"contrato_id": ajeno.id}, headers=gerente_h)
+    assert r.status_code == 422
+    equipo = (await client.get(f"/api/v1/equipos/{BODY['serie']}", headers=gerente_h)).json()
+    assert equipo["contrato_id"] == contrato.id
 
 
 async def test_equipo_inexistente_404_y_sin_token_401(client, gerente_h):

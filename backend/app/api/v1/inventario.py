@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_session
 from app.core.deps import get_current_user, require_role
-from app.models.orden import OrdenServicio
+from app.models.orden import ActaInmutable, OrdenServicio
 from app.models.repuesto import MovimientoInventario, Repuesto
 from app.models.usuario import Usuario
 from app.schemas.inventario import MovimientoIn, MovimientoOut, RepuestoIn, RepuestoOut
@@ -52,8 +52,15 @@ async def registrar(
     session: AsyncSession = Depends(get_session),
     usuario: Usuario = Depends(require_role("GERENCIA")),
 ):
-    if datos.orden_id is not None and await session.get(OrdenServicio, datos.orden_id) is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Orden no encontrada")
+    if datos.orden_id is not None:
+        orden = (await session.execute(select(OrdenServicio).where(
+            OrdenServicio.id == datos.orden_id
+        ).with_for_update().execution_options(populate_existing=True))).scalar_one_or_none()
+        if orden is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Orden no encontrada")
+        firmada = await session.scalar(select(ActaInmutable.id).where(ActaInmutable.orden_id == datos.orden_id))
+        if firmada is not None or orden.estado == "LIQUIDADA":
+            raise HTTPException(status.HTTP_409_CONFLICT, "Corrige el consumo de esta orden mediante una adenda con observación")
     try:
         return await svc.registrar_movimiento(
             session, datos.repuesto_codigo, datos.tipo, datos.cantidad, usuario.id, orden_id=datos.orden_id

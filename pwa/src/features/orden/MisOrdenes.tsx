@@ -1,5 +1,8 @@
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { db } from "../../db/dexie";
+import { EVENTO_OUTBOX } from "../../db/outbox";
+import { admiteReintentoManual, exportarOrden, reintentarOrden } from "../../db/recuperacion";
 
 const ETIQUETA_ESTADO: Record<string, string> = {
   pendiente: "Pendiente de sincronizar",
@@ -12,10 +15,45 @@ const ETIQUETA_ESTADO: Record<string, string> = {
 /** Review Focus 3 / spec §3.6: las órdenes en error deben quedar visibles, nunca desaparecer
  * en silencio (RNF-04). Se lee vía TanStack Query para poder invalidarse desde "Sincronizar
  * ahora" (App.tsx) y refrescar la lista automáticamente tras cada pasada del Outbox. */
-export function MisOrdenes() {
+export function MisOrdenes({ tecnicoId }: { tecnicoId: number }) {
+  const qc = useQueryClient();
+  const [accion, setAccion] = useState<{ tecnicoId: number; id: string } | null>(null);
+  const [errorAccion, setErrorAccion] = useState<{ tecnicoId: number; mensaje: string } | null>(null);
+  async function recuperar(id: string, exportar: boolean) {
+    setAccion({ tecnicoId, id });
+    setErrorAccion(null);
+    try {
+      if (exportar) {
+        const contenido = await exportarOrden(id, tecnicoId);
+        const url = URL.createObjectURL(new Blob([contenido], { type: "application/json;charset=utf-8" }));
+        const enlace = document.createElement("a");
+        try {
+          enlace.href = url;
+          enlace.download = `orden-${id}.json`;
+          document.body.appendChild(enlace);
+          enlace.click();
+        } finally {
+          enlace.remove();
+          URL.revokeObjectURL(url);
+        }
+      } else {
+        await reintentarOrden(id, tecnicoId);
+      }
+    } catch (e) {
+      setErrorAccion({ tecnicoId, mensaje: e instanceof Error ? e.message : "No se pudo completar la acción. Intenta nuevamente" });
+    } finally {
+      setAccion(null);
+      await qc.invalidateQueries({ queryKey: ["ordenesLocal", tecnicoId] });
+    }
+  }
+  useEffect(() => {
+    const refrescar = () => { void qc.invalidateQueries({ queryKey: ["ordenesLocal", tecnicoId] }); };
+    window.addEventListener(EVENTO_OUTBOX, refrescar);
+    return () => window.removeEventListener(EVENTO_OUTBOX, refrescar);
+  }, [qc, tecnicoId]);
   const { data: ordenes = [] } = useQuery({
-    queryKey: ["ordenesLocal"],
-    queryFn: async () => (await db.ordenesLocal.toArray()).sort((a, b) => b.creado_en_local.localeCompare(a.creado_en_local)),
+    queryKey: ["ordenesLocal", tecnicoId],
+    queryFn: async () => (await db.ordenesLocal.where("tecnico_id").equals(tecnicoId).toArray()).sort((a, b) => b.creado_en_local.localeCompare(a.creado_en_local)),
   });
 
   return (
@@ -25,6 +63,7 @@ export function MisOrdenes() {
         <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-950">Mis órdenes</h1>
         <p className="mt-1 text-sm text-slate-600">Consulta el estado de guardado y sincronización de tus servicios.</p>
       </header>
+      {errorAccion?.tecnicoId === tecnicoId && <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">{errorAccion.mensaje}</p>}
       {ordenes.length === 0 ? (
         <div className="rounded-xl border border-dashed border-slate-300 bg-white p-6 text-center">
           <p className="font-semibold text-slate-800">No hay órdenes registradas</p>
@@ -47,6 +86,16 @@ export function MisOrdenes() {
               <p className="mt-2 text-sm font-medium text-slate-900">Equipo {o.equipo_serie}</p>
               <p className="mt-0.5 text-xs text-slate-500">Intervención {o.tipo_intervencion}</p>
               {o.error_detalle && <p className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">{o.error_detalle}</p>}
+              {o.estado_sync === "error" && <div className="mt-3 space-y-2">
+                <p className="text-xs text-slate-600">Exportar JSON guarda una copia local con la firma y los datos de esta orden. Funciona sin conexión, incluso con el turno vencido.</p>
+                <p className="text-xs text-slate-600">{admiteReintentoManual(o)
+                  ? "Pide a Gerencia resolver la causa antes de reintentar el envío. Se conserva el acta original."
+                  : "Esta orden requiere revisión. Exporta el JSON original para Gerencia; el acta firmada no se modifica."}</p>
+                <div className="flex flex-wrap gap-3">
+                  <button type="button" disabled={accion?.tecnicoId === tecnicoId} onClick={() => void recuperar(o.id, true)} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold disabled:opacity-50">Exportar JSON</button>
+                  {admiteReintentoManual(o) && <button type="button" disabled={accion?.tecnicoId === tecnicoId} onClick={() => void recuperar(o.id, false)} className="rounded-lg bg-blue-700 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50">Reintentar envío</button>}
+                </div>
+              </div>}
             </li>
           ))}
         </ul>
