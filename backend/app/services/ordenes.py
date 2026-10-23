@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.contrato import Contrato
 from app.models.equipo import Equipo
 from app.models.orden import ActaInmutable, OrdenServicio
+from app.models.repuesto import MovimientoInventario
 from app.models.usuario import Usuario
 from app.schemas.orden import OrdenSincronizarIn
 from app.services.condiciones import condiciones_en_fecha
@@ -32,6 +33,10 @@ class ContratoNoEncontrado(OrdenSyncError):
 
 
 class ContratoInvalido(OrdenSyncError):
+    pass
+
+
+class OrdenIdReutilizado(OrdenSyncError):
     pass
 
 
@@ -66,6 +71,67 @@ def _hash(payload_raw: str) -> str:
     return hashlib.sha256(payload_raw.encode("utf-8")).hexdigest()
 
 
+async def _reintento_mismo_contenido(
+    session: AsyncSession, existente: OrdenServicio, datos: OrdenSincronizarIn
+) -> bool:
+    """Confirma que un UUID existente representa este mismo envío, incluidos acta y repuestos."""
+    acta = await session.scalar(select(ActaInmutable).where(ActaInmutable.orden_id == existente.id))
+    if acta is None or _hash(acta.payload_raw) != acta.hash_sha256:
+        return False
+    try:
+        guardado = json.loads(acta.payload_raw)
+    except (TypeError, json.JSONDecodeError):
+        return False
+    if not isinstance(guardado, dict):
+        return False
+
+    if guardado.get("version") == 2:
+        esperado = json.loads(payload_raw_canonico(
+            datos, sla_horas_max_respuesta=existente.sla_horas_max_respuesta
+        ))
+        return guardado == esperado
+
+    # Compatibilidad con actas v1: esas actas no incluían fechas SLA ni repuestos.
+    # Se cotejan sus campos probatorios y se completan los datos omitidos con la orden
+    # y los movimientos persistidos, para no aceptar una reutilización distinta.
+    esperado_v1 = {
+        "id": str(datos.id),
+        "contrato_id": datos.contrato_id,
+        "equipo_serie": datos.equipo_serie,
+        "tecnico_id": datos.tecnico_id,
+        "tipo_intervencion": datos.tipo_intervencion,
+        "fecha_creacion_cliente": datos.fecha_creacion_cliente.isoformat(),
+        "lecturas_agua": datos.lecturas_agua.model_dump(),
+        "firma_base64": datos.firma_base64,
+        "gps_latitud": str(datos.gps_latitud),
+        "gps_longitud": str(datos.gps_longitud),
+    }
+    if guardado != esperado_v1 or (
+        existente.contrato_id != datos.contrato_id
+        or existente.equipo_serie != datos.equipo_serie
+        or existente.tecnico_id != datos.tecnico_id
+        or existente.tipo_intervencion != datos.tipo_intervencion
+        or existente.fecha_creacion_cliente != datos.fecha_creacion_cliente
+        or existente.fecha_solicitud != datos.fecha_solicitud
+        or existente.fecha_primera_atencion != datos.fecha_primera_atencion
+    ):
+        return False
+
+    movimientos = (await session.execute(
+        select(MovimientoInventario.repuesto_codigo, MovimientoInventario.cantidad).where(
+            MovimientoInventario.orden_id == existente.id,
+            MovimientoInventario.tipo == "SALIDA_ORDEN",
+        )
+    )).all()
+    consumido_guardado: dict[str, int] = {}
+    for codigo, cantidad in movimientos:
+        consumido_guardado[codigo] = consumido_guardado.get(codigo, 0) + cantidad
+    consumido_recibido: dict[str, int] = {}
+    for item in datos.repuestos_consumidos:
+        consumido_recibido[item.repuesto_codigo] = consumido_recibido.get(item.repuesto_codigo, 0) + item.cantidad
+    return consumido_guardado == consumido_recibido
+
+
 async def sincronizar_orden(session: AsyncSession, datos: OrdenSincronizarIn, usuario: Usuario) -> OrdenServicio:
     """RN-04: encadena el hash del acta al de la ultima acta del mismo equipo.
     Idempotente por datos.id: un reintento del mismo UUID devuelve la orden ya creada,
@@ -77,6 +143,8 @@ async def sincronizar_orden(session: AsyncSession, datos: OrdenSincronizarIn, us
     if existente is not None:
         if usuario.rol != "GERENCIA" and existente.tecnico_id != usuario.id:
             raise TecnicoNoAutorizado(str(usuario.id))
+        if not await _reintento_mismo_contenido(session, existente, datos):
+            raise OrdenIdReutilizado(f"El UUID {datos.id} ya pertenece a una orden con contenido distinto")
         return existente
 
     async with session.begin_nested():
@@ -88,6 +156,8 @@ async def sincronizar_orden(session: AsyncSession, datos: OrdenSincronizarIn, us
         if existente is not None:
             if usuario.rol != "GERENCIA" and existente.tecnico_id != usuario.id:
                 raise TecnicoNoAutorizado(str(usuario.id))
+            if not await _reintento_mismo_contenido(session, existente, datos):
+                raise OrdenIdReutilizado(f"El UUID {datos.id} ya pertenece a una orden con contenido distinto")
             return existente
 
         # Contrato → equipo → repuestos ordenados es el orden global de locks.
@@ -102,6 +172,10 @@ async def sincronizar_orden(session: AsyncSession, datos: OrdenSincronizarIn, us
         # Revalidar después de adquirir el lock, nunca confiar en la lectura previa.
         existente = await session.get(OrdenServicio, datos.id)
         if existente is not None:
+            if usuario.rol != "GERENCIA" and existente.tecnico_id != usuario.id:
+                raise TecnicoNoAutorizado(str(usuario.id))
+            if not await _reintento_mismo_contenido(session, existente, datos):
+                raise OrdenIdReutilizado(f"El UUID {datos.id} ya pertenece a una orden con contenido distinto")
             return existente
         if equipo.contrato_id != contrato.id or equipo.cliente_ruc != contrato.cliente_ruc:
             raise ContratoInvalido("Asocia el equipo a un contrato de su mismo cliente antes de sincronizar")
