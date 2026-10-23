@@ -221,11 +221,14 @@ export function EquiposPage() {
           <h1 className="text-2xl font-bold tracking-tight text-slate-950">Equipos</h1>
           <p className="mt-1 text-sm text-slate-500">Estado preventivo y vida útil remanente por sistema.</p>
         </div>
-        {puedeEscribir && !abierto && (
-          <button type="button" onClick={() => abrir()} className="rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">
-            Nuevo equipo
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {puedeEscribir && <button type="button" className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600" onClick={() => setVerEjecuciones(!verEjecuciones)}>{verEjecuciones ? "Ocultar ejecuciones de IA" : "Ver ejecuciones de IA"}</button>}
+          {puedeEscribir && !abierto && (
+            <button type="button" onClick={() => abrir()} className="rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">
+              Nuevo equipo
+            </button>
+          )}
+        </div>
       </div>
 
       {abierto && (
@@ -279,14 +282,6 @@ export function EquiposPage() {
         </FormPanel>
       )}
 
-      <aside aria-label="Estimaciones experimentales" className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
-        <p className="font-semibold">Estimación experimental basada en datos sintéticos</p>
-        <p>Usa el tipo de sistema y su antigüedad desde la instalación original; todavía no incorpora lecturas de campo ni fallas reales.
-          Requiere revisión técnica y no certifica la calidad del agua.</p>
-        <p>Los reemplazos de componentes no convierten todo el sistema en nuevo. Sus ciclos se registran por separado.</p>
-        <p>La vigencia es un plazo operativo; no expresa confianza estadística. Una cifra vencida requiere recálculo.</p>
-        {puedeEscribir && <button type="button" className="mt-2 font-semibold text-blue-700" onClick={()=>setVerEjecuciones(!verEjecuciones)}>{verEjecuciones ? "Ocultar ejecuciones de IA" : "Ver ejecuciones de IA"}</button>}
-      </aside>
       {puedeEscribir && verEjecuciones && <EjecucionesRul/>}
       {puedeEscribir && <SupervisionRul/>}
       <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 p-4">
