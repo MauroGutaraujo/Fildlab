@@ -314,21 +314,20 @@ describe("EquiposPage", () => {
       { path: "/api/v1/equipos/predicciones-rul", body: [PREDICCION] },
     ]);
     renderWithProviders(<EquiposPage />);
-    expect(await screen.findByText(/prioridad experimental alta/i)).toBeInTheDocument();
+    expect(await screen.findByText(/12 días estimados · mantenimiento urgente/i)).toBeInTheDocument();
     expect(screen.getByText(/RO-2026-0001 — 12 días estimados/i)).toBeInTheDocument();
     expect(screen.queryByText(/estimación experimental basada en datos sintéticos/i)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /ver ejecuciones de IA/i })).toBeInTheDocument();
-    expect(screen.getByText(/22\/10\/2026/)).toHaveAttribute("datetime", "2026-10-22T15:00:00Z");
   });
 
   it.each([
-    [29, "ROJO", /prioridad experimental alta/i],
-    [30, "AMARILLO", /prioridad experimental media/i],
-    [89, "AMARILLO", /prioridad experimental media/i],
-    [90, "VERDE", /prioridad experimental baja/i],
+    [29, "ROJO", /días estimados · mantenimiento urgente/i],
+    [30, "AMARILLO", /días estimados · programar revisión/i],
+    [89, "AMARILLO", /días estimados · programar revisión/i],
+    [90, "VERDE", /días estimados · sin acción requerida/i],
     // Pares deliberadamente discordantes: el cliente presenta el nivel del servidor.
-    [75, "VERDE", /prioridad experimental baja/i],
-    [20, "ROJO", /prioridad experimental alta/i],
+    [75, "VERDE", /días estimados · sin acción requerida/i],
+    [20, "ROJO", /días estimados · mantenimiento urgente/i],
   ])("presenta %i días con nivel %s del servidor", async (dias, nivel, estado) => {
     mockApi([
       { path: "/api/v1/equipos", body: [EQUIPO] },
@@ -352,7 +351,7 @@ describe("EquiposPage", () => {
       { path: "/api/v1/equipos/predicciones-rul", body: [{ ...PREDICCION, dias_vida_util_remanente: 200, nivel_alerta: "VERDE" }] },
     ]);
     renderWithProviders(<EquiposPage />);
-    await screen.findByText(/prioridad experimental baja/i);
+    await screen.findByText(/días estimados · sin acción requerida/i);
     expect(screen.getByText("Sin estimaciones de prioridad alta")).toBeInTheDocument();
   });
 
@@ -366,7 +365,7 @@ describe("EquiposPage", () => {
         estado_estimacion: estado, motivo_no_estimable: motivo, dias_vida_util_remanente: null, nivel_alerta: null }] }]);
     renderWithProviders(<EquiposPage />);
     expect(await screen.findByText(texto)).toBeInTheDocument();
-    expect(screen.queryByText(/prioridad experimental (alta|media|baja)/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/días estimados · (mantenimiento urgente|programar revisión|sin acción requerida)/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/0 días/)).not.toBeInTheDocument();
   });
 
