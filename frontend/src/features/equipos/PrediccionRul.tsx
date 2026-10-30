@@ -19,9 +19,9 @@ export type PrediccionRul = {
 };
 
 const ALERTAS = {
-  VERDE: { label: "Prioridad experimental baja", color: "border-emerald-200 bg-emerald-50 text-emerald-800" },
-  AMARILLO: { label: "Prioridad experimental media", color: "border-amber-200 bg-amber-50 text-amber-900" },
-  ROJO: { label: "Prioridad experimental alta", color: "border-rose-200 bg-rose-50 text-rose-800" },
+  VERDE: { label: "Sin acción requerida", color: "border-emerald-200 bg-emerald-50 text-emerald-800" },
+  AMARILLO: { label: "Programar revisión", color: "border-amber-200 bg-amber-50 text-amber-900" },
+  ROJO: { label: "Mantenimiento urgente", color: "border-rose-200 bg-rose-50 text-rose-800" },
 };
 
 const MOTIVOS: Record<string, string> = {
@@ -56,32 +56,18 @@ export function useRelojRul(predicciones: PrediccionRul[] | undefined) {
 }
 
 export function ResultadoRul({ prediccion: p }: { prediccion: PrediccionRul | undefined }) {
-  const fecha = p ? new Date(p.actualizado_en) : null;
-  const fechaValida = fecha && Number.isFinite(fecha.getTime());
   const estado = esEstimacion(p) ? ALERTAS[p.nivel_alerta] : null;
   const sinEstimacion = !p ? "Sin evaluar"
     : p.estado_estimacion === "REQUIERE_RECALCULO" ? "Recálculo pendiente"
-    : p.estado_estimacion === "VENCIDA" || (p.vence_en && Date.parse(p.vence_en) <= Date.now()) ? "Estimación vencida · recálculo pendiente"
+    : p.estado_estimacion === "VENCIDA" || (p.vence_en && Date.parse(p.vence_en) <= Date.now()) ? "Estimación vencida"
     : p.estado_estimacion === "NO_ESTIMABLE" ? MOTIVOS[p.motivo_no_estimable ?? ""] ?? "Sin estimación disponible"
     : "Recálculo pendiente";
   return <>
     {estado ? <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold ${estado.color}`}>
       <span aria-hidden="true" className="h-2 w-2 rounded-full bg-current" />
-      {estado.label} · {p?.dias_vida_util_remanente} días
+      {p?.dias_vida_util_remanente} días estimados · {estado.label}
     </span> : <span className="inline-block rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-medium text-slate-600">
       {sinEstimacion}
-    </span>}
-    {p?.alcance_estimacion === "SISTEMA_DESDE_INSTALACION" && p.fecha_referencia &&
-      <span className="text-xs text-slate-500">Referencia del sistema: {p.fecha_referencia}</span>}
-    {p && <span className="text-xs text-slate-500">
-      Último cálculo: {fechaValida ? <time dateTime={p.actualizado_en}>{new Intl.DateTimeFormat("es-PE", {
-        timeZone: "America/Lima", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit",
-      }).format(fecha)} (Lima)</time> : "fecha no disponible"}
-    </span>}
-    {p?.vence_en && Number.isFinite(Date.parse(p.vence_en)) && <span className="text-xs text-slate-500">
-      Vencimiento operativo: <time dateTime={p.vence_en}>{new Intl.DateTimeFormat("es-PE", {
-        timeZone:"America/Lima", dateStyle:"short", timeStyle:"short",
-      }).format(new Date(p.vence_en))} (Lima)</time>
     </span>}
   </>;
 }
