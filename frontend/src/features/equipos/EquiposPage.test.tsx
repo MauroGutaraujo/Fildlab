@@ -105,6 +105,15 @@ describe("EquiposPage", () => {
     expect(screen.queryByRole("button", { name: /editar/i })).not.toBeInTheDocument();
   });
 
+  it("el botón «Ver ejecuciones de IA» sigue visible con el formulario de nuevo equipo abierto", async () => {
+    mockApi([{ path: "/api/v1/equipos", body: [] }, SIN_PREDICCIONES]);
+    renderWithProviders(<EquiposPage />);
+    await userEvent.click(await screen.findByRole("button", { name: /^ver ejecuciones de ia$/i }));
+    expect(screen.getByRole("button", { name: /^ocultar ejecuciones de ia$/i })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /^nuevo equipo$/i }));
+    expect(screen.getByRole("button", { name: /^ocultar ejecuciones de ia$/i })).toBeInTheDocument();
+  });
+
   it("lista vacía muestra «Sin datos disponibles»", async () => {
     mockApi([{ path: "/api/v1/equipos", body: [] }, SIN_PREDICCIONES]);
     renderWithProviders(<EquiposPage />);
@@ -307,8 +316,7 @@ describe("EquiposPage", () => {
     renderWithProviders(<EquiposPage />);
     expect(await screen.findByText(/prioridad experimental alta/i)).toBeInTheDocument();
     expect(screen.getByText(/RO-2026-0001 — 12 días estimados/i)).toBeInTheDocument();
-    expect(screen.getByText(/estimación experimental basada en datos sintéticos/i)).toBeInTheDocument();
-    expect(screen.getByText(/no certifica la calidad del agua/i)).toBeInTheDocument();
+    expect(screen.queryByText(/estimación experimental basada en datos sintéticos/i)).not.toBeInTheDocument();
     expect(screen.getByText(/22\/10\/2026/)).toHaveAttribute("datetime", "2026-10-22T15:00:00Z");
   });
 
