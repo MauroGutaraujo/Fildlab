@@ -105,6 +105,15 @@ describe("EquiposPage", () => {
     expect(screen.queryByRole("button", { name: /editar/i })).not.toBeInTheDocument();
   });
 
+  it("el botón «Ver ejecuciones de IA» sigue visible con el formulario de nuevo equipo abierto", async () => {
+    mockApi([{ path: "/api/v1/equipos", body: [] }, SIN_PREDICCIONES]);
+    renderWithProviders(<EquiposPage />);
+    await userEvent.click(await screen.findByRole("button", { name: /^ver ejecuciones de ia$/i }));
+    expect(screen.getByRole("button", { name: /^ocultar ejecuciones de ia$/i })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /^nuevo equipo$/i }));
+    expect(screen.getByRole("button", { name: /^ocultar ejecuciones de ia$/i })).toBeInTheDocument();
+  });
+
   it("lista vacía muestra «Sin datos disponibles»", async () => {
     mockApi([{ path: "/api/v1/equipos", body: [] }, SIN_PREDICCIONES]);
     renderWithProviders(<EquiposPage />);
