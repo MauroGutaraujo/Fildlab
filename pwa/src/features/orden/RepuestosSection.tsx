@@ -1,5 +1,5 @@
 type Repuesto = { repuesto_codigo: string; cantidad: number };
-type Sugerencia = { codigo: string; disponible: number };
+type Sugerencia = { codigo: string; texto: string };
 type Props = {
   codigo: string;
   cantidad: string;
@@ -28,7 +28,7 @@ export function RepuestosSection({ codigo, cantidad, repuestos, error, sugerenci
           />
           <datalist id="repuestos-disponibles">
             {sugerencias.map((s) => (
-              <option key={s.codigo} value={s.codigo}>{s.codigo} — {s.disponible} disponibles</option>
+              <option key={s.codigo} value={s.codigo}>{s.texto}</option>
             ))}
           </datalist>
         </label>

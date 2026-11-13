@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { StockMovil } from "./StockMovil";
 import { db } from "../../db/dexie";
 import { cargarStockTurno } from "../../db/stock";
+
+function opcionesDatalist(id: string): string[] {
+  return Array.from(document.getElementById(id)?.querySelectorAll("option") ?? []).map((o) => o.getAttribute("value") ?? "");
+}
 
 describe("StockMovil", () => {
   it("registra la carga de turno y la refleja en Dexie", async () => {
@@ -19,14 +23,21 @@ describe("StockMovil", () => {
     await userEvent.type(screen.getByLabelText(/código de repuesto/i), "FILT-05");
     await userEvent.type(screen.getByLabelText(/cantidad cargada/i), "10");
     await userEvent.click(screen.getByRole("button", { name: /cargar/i }));
-    expect(await screen.findByText("FILT-05")).toBeInTheDocument();
-    expect(screen.getByText(/10 disponibles/i)).toBeInTheDocument();
+    const stockActual = (await screen.findByText("Tu stock actual")).closest("section")!;
+    expect(within(stockActual).getByText("FILT-05")).toBeInTheDocument();
+    expect(within(stockActual).getByText(/10 disponibles/i)).toBeInTheDocument();
   });
 
   it("sugiere códigos ya usados por el técnico en cargas anteriores", async () => {
     await cargarStockTurno([{ repuesto_codigo: "FILT-05", cantidad: 4 }], "turno-anterior", 2);
     render(<StockMovil tecnicoId={2} />);
-    expect(await screen.findByText(/FILT-05/)).toBeInTheDocument();
+    await waitFor(() => expect(opcionesDatalist("codigos-conocidos")).toContain("FILT-05"));
+  });
+
+  it("sugiere el catálogo de repuestos sincronizado, aunque el técnico no lo haya cargado antes", async () => {
+    await db.catalogoLocal.add({ id: "MEM-RO-01", tipo: "repuesto", datos: { codigo: "MEM-RO-01", descripcion: "Membrana RO" }, actualizado_en: "2026-01-01" });
+    render(<StockMovil tecnicoId={2} />);
+    await waitFor(() => expect(opcionesDatalist("codigos-conocidos")).toContain("MEM-RO-01"));
   });
 
   it.each(["abc", "-2", "1.5", "Infinity"])("rechaza la carga %s y muestra el error", async (cantidad) => {

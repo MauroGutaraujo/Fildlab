@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { db, type StockTecnicoItem } from "../../db/dexie";
+import { obtenerRepuestosCatalogo, type RepuestoApi } from "../../db/catalogo";
 import { cerrarBorrador, descartarBorrador } from "../../db/ordenes";
 import { comprobarDisponibilidad } from "../../db/stock";
 import { CAMPOS_LECTURA_ORDEN, type CampoLectura, errorLectura } from "../../lib/validators";
@@ -25,6 +26,7 @@ export function OrdenForm({ contratoId, equipoSerie, tecnicoId, onCerrada, onVol
   const gps = useGps();
   const { cambiar } = draft;
   const [stockTecnico, setStockTecnico] = useState<StockTecnicoItem[]>([]);
+  const [catalogo, setCatalogo] = useState<RepuestoApi[]>([]);
 
   useEffect(() => {
     if (gps.lat !== null && gps.lng !== null) cambiar({ gps_latitud: gps.lat, gps_longitud: gps.lng });
@@ -35,18 +37,24 @@ export function OrdenForm({ contratoId, equipoSerie, tecnicoId, onCerrada, onVol
     db.stockPorTecnico.where("tecnico_id").equals(tecnicoId).toArray()
       .then((items) => { if (activo) setStockTecnico(items); })
       .catch(() => {});
+    obtenerRepuestosCatalogo().then((items) => { if (activo) setCatalogo(items); }).catch(() => {});
     return () => { activo = false; };
   }, [tecnicoId]);
 
   if (!draft.borrador) return <section className="p-4"><p role={draft.error ? "alert" : "status"}>{draft.error ?? "Recuperando borrador…"}</p></section>;
   const { lecturas, firma_base64: firma, tipo_intervencion: tipoIntervencion, repuestos_consumidos: repuestos,
     gps_latitud: lat, gps_longitud: lng } = draft.borrador;
-  const sugerenciasRepuestos = stockTecnico
+  const sugerenciasStock = stockTecnico
     .map((item) => {
       const enEstaOrden = repuestos.filter((r) => r.repuesto_codigo === item.repuesto_codigo).reduce((total, r) => total + r.cantidad, 0);
       return { codigo: item.repuesto_codigo, disponible: item.cantidad_cargada - item.cantidad_consumida - enEstaOrden };
     })
-    .filter((s) => s.disponible > 0);
+    .filter((s) => s.disponible > 0)
+    .map((s) => ({ codigo: s.codigo, texto: `${s.codigo} — ${s.disponible} disponibles` }));
+  // Sin stock cargado todavía, el catálogo general sirve como referencia de códigos válidos;
+  // intentar consumir uno sin stock sigue siendo rechazado por comprobarDisponibilidad.
+  const sugerenciasRepuestos = sugerenciasStock.length > 0 ? sugerenciasStock
+    : catalogo.map((r) => ({ codigo: r.codigo, texto: `${r.codigo} — ${r.descripcion}` }));
   const errores = Object.fromEntries(CAMPOS_LECTURA_ORDEN.map((c) => [c, errorLectura(c, lecturas[c])])) as Record<CampoLectura, string | null>;
   const lecturasCompletas = CAMPOS_LECTURA_ORDEN.every((c) => errores[c] === null);
   const gpsCompleto = lat !== null && lng !== null;

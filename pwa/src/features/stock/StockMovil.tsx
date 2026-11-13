@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { cargarStockTurno } from "../../db/stock";
 import { db, type StockTecnicoItem } from "../../db/dexie";
+import { obtenerRepuestosCatalogo, type RepuestoApi } from "../../db/catalogo";
 
 export function StockMovil({ tecnicoId }: { tecnicoId: number }) {
   const [codigo, setCodigo] = useState("");
@@ -11,6 +12,7 @@ export function StockMovil({ tecnicoId }: { tecnicoId: number }) {
   const [guardando, setGuardando] = useState(false);
   const [hayStockAnterior, setHayStockAnterior] = useState(false);
   const [stockActual, setStockActual] = useState<StockTecnicoItem[]>([]);
+  const [catalogo, setCatalogo] = useState<RepuestoApi[]>([]);
 
   async function recargarStockActual() {
     const items = await db.stockPorTecnico.where("tecnico_id").equals(tecnicoId).toArray();
@@ -22,8 +24,16 @@ export function StockMovil({ tecnicoId }: { tecnicoId: number }) {
     db.stockMovilLocal.count().then((n) => { if (activo) setHayStockAnterior(n > 0); })
       .catch(() => { if (activo) setError("No se pudo consultar el stock anterior"); });
     void recargarStockActual();
+    obtenerRepuestosCatalogo().then((items) => { if (activo) setCatalogo(items); }).catch(() => {});
     return () => { activo = false; };
   }, [tecnicoId]);
+
+  const sugerencias = [
+    ...catalogo.map((r) => ({ codigo: r.codigo, texto: `${r.codigo} — ${r.descripcion}` })),
+    ...stockActual
+      .filter((item) => !catalogo.some((r) => r.codigo === item.repuesto_codigo))
+      .map((item) => ({ codigo: item.repuesto_codigo, texto: item.repuesto_codigo })),
+  ];
 
   async function cargar(e: FormEvent) {
     e.preventDefault();
@@ -62,8 +72,8 @@ export function StockMovil({ tecnicoId }: { tecnicoId: number }) {
             className="mt-1.5 min-h-12 w-full rounded-lg border border-slate-300 bg-white px-3.5 py-3 text-base text-slate-950 shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
           />
           <datalist id="codigos-conocidos">
-            {stockActual.map((item) => (
-              <option key={item.repuesto_codigo} value={item.repuesto_codigo} />
+            {sugerencias.map((s) => (
+              <option key={s.codigo} value={s.codigo}>{s.texto}</option>
             ))}
           </datalist>
         </label>

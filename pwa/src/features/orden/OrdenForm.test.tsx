@@ -118,6 +118,14 @@ describe("OrdenForm — lecturas de agua", () => {
     expect(await screen.findByText("FILT-05 — 10 disponibles")).toBeInTheDocument();
   });
 
+  it("sin stock cargado, sugiere el catálogo general de repuestos como referencia", async () => {
+    await db.catalogoLocal.add({ id: "MEM-RO-01", tipo: "repuesto", datos: { codigo: "MEM-RO-01", descripcion: "Membrana RO" }, actualizado_en: "2026-01-01" });
+    render(<OrdenForm contratoId={1} equipoSerie="RO-1" tecnicoId={2} />);
+    await screen.findByLabelText(/^ph$/i);
+    await completarLecturasValidas();
+    expect(await screen.findByText("MEM-RO-01 — Membrana RO")).toBeInTheDocument();
+  });
+
   it("resta del disponible sugerido lo ya agregado a la orden en curso", async () => {
     await cargarStockTurno([{ repuesto_codigo: "FILT-05", cantidad: 10 }], "turno-test", 2);
     render(<OrdenForm contratoId={1} equipoSerie="RO-1" tecnicoId={2} />);
