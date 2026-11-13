@@ -110,6 +110,34 @@ describe("OrdenForm — lecturas de agua", () => {
     expect((await db.stockPorTecnico.get([2, "FILT-05"]))?.cantidad_consumida).toBe(0);
   });
 
+  it("sugiere los repuestos del stock móvil del técnico con su cantidad disponible", async () => {
+    await cargarStockTurno([{ repuesto_codigo: "FILT-05", cantidad: 10 }], "turno-test", 2);
+    render(<OrdenForm contratoId={1} equipoSerie="RO-1" tecnicoId={2} />);
+    await screen.findByLabelText(/^ph$/i);
+    await completarLecturasValidas();
+    expect(await screen.findByText("FILT-05 — 10 disponibles")).toBeInTheDocument();
+  });
+
+  it("sin stock cargado, sugiere el catálogo general de repuestos como referencia", async () => {
+    await db.catalogoLocal.add({ id: "MEM-RO-01", tipo: "repuesto", datos: { codigo: "MEM-RO-01", descripcion: "Membrana RO" }, actualizado_en: "2026-01-01" });
+    render(<OrdenForm contratoId={1} equipoSerie="RO-1" tecnicoId={2} />);
+    await screen.findByLabelText(/^ph$/i);
+    await completarLecturasValidas();
+    expect(await screen.findByText("MEM-RO-01 — Membrana RO")).toBeInTheDocument();
+  });
+
+  it("resta del disponible sugerido lo ya agregado a la orden en curso", async () => {
+    await cargarStockTurno([{ repuesto_codigo: "FILT-05", cantidad: 10 }], "turno-test", 2);
+    render(<OrdenForm contratoId={1} equipoSerie="RO-1" tecnicoId={2} />);
+    await screen.findByLabelText(/^ph$/i);
+    await completarLecturasValidas();
+    await userEvent.type(screen.getByLabelText(/código de repuesto/i), "FILT-05");
+    await userEvent.type(screen.getByLabelText(/cantidad consumida/i), "3");
+    await userEvent.click(screen.getByRole("button", { name: /agregar repuesto/i }));
+    await waitFor(async () => expect((await abrirBorrador(2, "RO-1", 1)).repuestos_consumidos).toHaveLength(1));
+    expect(screen.getByText("FILT-05 — 7 disponibles")).toBeInTheDocument();
+  });
+
   it("permite completar una firma con varios trazos sin desmontar el lienzo", async () => {
     render(<OrdenForm contratoId={1} equipoSerie="RO-1" tecnicoId={2} />);
     await screen.findByLabelText(/^ph$/i);

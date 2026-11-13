@@ -15,7 +15,7 @@ export interface LecturasAgua {
 
 export interface CatalogoItem {
   id: string;
-  tipo: "cliente" | "equipo" | "contrato";
+  tipo: "cliente" | "equipo" | "contrato" | "repuesto";
   datos: unknown;
   actualizado_en: string;
 }
