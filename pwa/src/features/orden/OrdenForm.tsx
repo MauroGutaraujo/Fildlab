@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { db, type StockTecnicoItem } from "../../db/dexie";
 import { cerrarBorrador, descartarBorrador } from "../../db/ordenes";
 import { comprobarDisponibilidad } from "../../db/stock";
 import { CAMPOS_LECTURA_ORDEN, type CampoLectura, errorLectura } from "../../lib/validators";
@@ -23,14 +24,29 @@ export function OrdenForm({ contratoId, equipoSerie, tecnicoId, onCerrada, onVol
   const [firmaEnEdicion, setFirmaEnEdicion] = useState(false);
   const gps = useGps();
   const { cambiar } = draft;
+  const [stockTecnico, setStockTecnico] = useState<StockTecnicoItem[]>([]);
 
   useEffect(() => {
     if (gps.lat !== null && gps.lng !== null) cambiar({ gps_latitud: gps.lat, gps_longitud: gps.lng });
   }, [gps.lat, gps.lng, cambiar]);
 
+  useEffect(() => {
+    let activo = true;
+    db.stockPorTecnico.where("tecnico_id").equals(tecnicoId).toArray()
+      .then((items) => { if (activo) setStockTecnico(items); })
+      .catch(() => {});
+    return () => { activo = false; };
+  }, [tecnicoId]);
+
   if (!draft.borrador) return <section className="p-4"><p role={draft.error ? "alert" : "status"}>{draft.error ?? "Recuperando borrador…"}</p></section>;
   const { lecturas, firma_base64: firma, tipo_intervencion: tipoIntervencion, repuestos_consumidos: repuestos,
     gps_latitud: lat, gps_longitud: lng } = draft.borrador;
+  const sugerenciasRepuestos = stockTecnico
+    .map((item) => {
+      const enEstaOrden = repuestos.filter((r) => r.repuesto_codigo === item.repuesto_codigo).reduce((total, r) => total + r.cantidad, 0);
+      return { codigo: item.repuesto_codigo, disponible: item.cantidad_cargada - item.cantidad_consumida - enEstaOrden };
+    })
+    .filter((s) => s.disponible > 0);
   const errores = Object.fromEntries(CAMPOS_LECTURA_ORDEN.map((c) => [c, errorLectura(c, lecturas[c])])) as Record<CampoLectura, string | null>;
   const lecturasCompletas = CAMPOS_LECTURA_ORDEN.every((c) => errores[c] === null);
   const gpsCompleto = lat !== null && lng !== null;
@@ -152,12 +168,13 @@ export function OrdenForm({ contratoId, equipoSerie, tecnicoId, onCerrada, onVol
             cantidad={cantidadRepuesto}
             repuestos={repuestos}
             error={errorRepuesto}
+            sugerencias={sugerenciasRepuestos}
             onCodigoChange={setCodigoRepuesto}
             onCantidadChange={setCantidadRepuesto}
             onAgregar={agregarRepuesto}
           />
           <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-            <h2 className="mb-2 text-base font-bold text-slate-900">Firma del técnico</h2>
+            <h2 className="mb-2 text-base font-bold text-slate-900">Firma del cliente</h2>
             {firma && !firmaEnEdicion ? <div className="space-y-2"><img src={firma} alt="Firma guardada" className="w-full rounded border bg-white" /><button type="button" onClick={() => { setFirmaEnEdicion(true); cambiar({ firma_base64: null }); }} className="min-h-11 rounded border px-4">Limpiar firma</button></div>
               : <Firma onCambio={(valor) => { setFirmaEnEdicion(true); cambiar({ firma_base64: valor }); }} />}
           </section>

@@ -1,15 +1,17 @@
 type Repuesto = { repuesto_codigo: string; cantidad: number };
+type Sugerencia = { codigo: string; disponible: number };
 type Props = {
   codigo: string;
   cantidad: string;
   repuestos: Repuesto[];
   error: string | null;
+  sugerencias?: Sugerencia[];
   onCodigoChange: (codigo: string) => void;
   onCantidadChange: (cantidad: string) => void;
   onAgregar: () => void;
 };
 
-export function RepuestosSection({ codigo, cantidad, repuestos, error, onCodigoChange, onCantidadChange, onAgregar }: Props) {
+export function RepuestosSection({ codigo, cantidad, repuestos, error, sugerencias = [], onCodigoChange, onCantidadChange, onAgregar }: Props) {
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       <h2 className="text-base font-bold text-slate-900">Repuestos consumidos</h2>
@@ -21,8 +23,14 @@ export function RepuestosSection({ codigo, cantidad, repuestos, error, onCodigoC
             value={codigo}
             onChange={(e) => onCodigoChange(e.target.value)}
             autoComplete="off"
+            list="repuestos-disponibles"
             className="mt-1.5 min-h-12 w-full rounded-lg border border-slate-300 bg-white px-3.5 py-3 text-base text-slate-950 shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
           />
+          <datalist id="repuestos-disponibles">
+            {sugerencias.map((s) => (
+              <option key={s.codigo} value={s.codigo}>{s.codigo} — {s.disponible} disponibles</option>
+            ))}
+          </datalist>
         </label>
         <label className="block text-sm font-medium text-slate-700">
           Cantidad consumida
