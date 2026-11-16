@@ -112,16 +112,10 @@ async def poblar_datos(db_url: str) -> None:
         ).scalars().first()
 
         if not gerente:
-            print("[!] Advertencia: No se encontró usuario Gerencia. Creando uno por defecto...")
-            from app.core.security import hash_password
-            gerente = Usuario(
-                nombre="Administración Fildlab",
-                email="gerencia@fildlab.pe",
-                password_hash=hash_password("Fildlab2026Gerente!"),
-                rol="GERENCIA",
+            raise SystemExit(
+                "[!] No existe un usuario Gerencia. Créelo primero con "
+                "python -m app.scripts.crear_usuarios_iniciales"
             )
-            session.add(gerente)
-            await session.flush()
 
         # 1. Clientes
         for c_data in CLIENTES:
