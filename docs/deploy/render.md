@@ -43,6 +43,17 @@ $env:GERENTE_PASSWORD = "..."
 
 (Si tu plan de Render sí incluye acceso a **Shell** para el servicio, correr el mismo comando `python -m app.scripts.crear_gerente` ahí es una alternativa equivalente, con las variables ya cargadas desde el Environment del servicio.)
 
+### Cambiar la contraseña de un usuario existente
+Ninguna contraseña se guarda en el repositorio. Para cambiarla, con las mismas variables `DATABASE_URL` y `JWT_SECRET` del paso anterior (o desde la **Shell** de Render):
+
+```powershell
+cd backend
+.venv\Scripts\python -m app.scripts.cambiar_password gerencia@fildlab.pe
+.venv\Scripts\python -m app.scripts.cambiar_password tecnico@fildlab.pe
+```
+
+El script pide la nueva contraseña dos veces sin mostrarla (mínimo 12 caracteres) y solo guarda su hash Argon2.
+
 ## 5. Verificación post-deploy (Servicio en producción: `https://fildlab-api.onrender.com`)
 - `curl https://fildlab-api.onrender.com/api/v1/healthz` → `{"status":"ok"}`.
 - `curl -X POST https://fildlab-api.onrender.com/api/v1/auth/login -H "Content-Type: application/json" -d "{\"email\":\"...\",\"password\":\"...\"}"` con el usuario Gerencia recién creado → debe devolver un `access_token`.
